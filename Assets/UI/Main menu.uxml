@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xmlns:uie="UnityEditor.UIElements"
+    xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="project://database/Assets/UI/Menu%20Style.uss?fileID=7433441132597879392&amp;guid=76cc536a499db9346bed5c85b3bba50c&amp;type=3#Menu%20Style" />
+
+    <ui:VisualElement name="menu-root" class="menu-root">
+
+        <!-- ============================ screen effects ============================ -->
+        <ui:VisualElement name="fx-scrim" class="fx-scrim" picking-mode="Ignore" />
+        <ui:VisualElement name="fx-scanlines" class="fx-scanlines" picking-mode="Ignore" />
+        <ui:VisualElement name="fx-vignette" class="fx-vignette" picking-mode="Ignore" />
+
+        <!-- ============================ left: title + buttons ============================ -->
+        <ui:VisualElement name="left-column" class="left-column">
+
+            <ui:Label name="eyebrow" class="eyebrow" text="SECTOR 0 &#183; HUM 60HZ" />
+            <ui:Label name="title" class="title" text="BACKROOMS" />
+            <ui:Label name="subtitle" class="subtitle" text="NO EXIT" />
+            <ui:VisualElement class="divider" picking-mode="Ignore" />
+
+            <ui:VisualElement name="menu-list" class="menu-list">
+
+                <ui:VisualElement name="menu-item-play" class="menu-item">
+                    <ui:Label class="menu-item-marker" text="&gt;" />
+                    <ui:Button name="play-button" class="menu-button" text="ENTER" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="menu-item-settings" class="menu-item">
+                    <ui:Label class="menu-item-marker" text="&gt;" />
+                    <ui:Button name="settings-button" class="menu-button" text="SETTINGS" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="menu-item-controls" class="menu-item">
+                    <ui:Label class="menu-item-marker" text="&gt;" />
+                    <ui:Button name="controls-button" class="menu-button" text="CONTROLS" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="menu-item-quit" class="menu-item">
+                    <ui:Label class="menu-item-marker" text="&gt;" />
+                    <ui:Button name="quit-button" class="menu-button menu-button--danger" text="QUIT" />
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+
+            <ui:Label name="hint" class="hint" text="TAP A CHOICE OR USE THE ARROW KEYS" />
+        </ui:VisualElement>
+
+        <!-- ============================ top right: version ============================ -->
+        <ui:VisualElement name="version-block" class="version-block">
+            <ui:VisualElement class="version-rule" picking-mode="Ignore" />
+            <ui:Label name="version-label" class="version-label" text="v0.0.0" />
+            <ui:Label name="build-label" class="build-label" text="BUILD" />
+        </ui:VisualElement>
+
+        <!-- ============================ bottom right: credits ============================ -->
+        <ui:VisualElement name="credits-block" class="credits-block">
+            <ui:Label name="credits-heading" class="credits-heading" text="CREDITS" />
+            <ui:Label name="credits-design" class="credits-line" text="GAME DESIGN &amp; CODE &#8212; [ YOUR NAME ]" />
+            <ui:Label name="credits-art" class="credits-line" text="ENVIRONMENT ART &#8212; [ YOUR NAME ]" />
+            <ui:Label name="credits-audio" class="credits-line" text="SOUND &amp; MUSIC &#8212; [ YOUR NAME ]" />
+            <ui:Label name="credits-engine" class="credits-line credits-line--dim" text="MADE WITH UNITY 6 &#183; URP" />
+        </ui:VisualElement>
+
+        <!-- ============================ bottom left: hum / rec ============================ -->
+        <ui:VisualElement name="status-block" class="status-block">
+            <ui:Label name="rec-label" class="rec-label" text="&#9679; REC" />
+            <ui:Label name="hum-label" class="hum-label" text="HUMM &#183; HUMM &#183; HUMM" />
+        </ui:VisualElement>
+
+        <!-- ============================ settings overlay ============================ -->
+        <ui:VisualElement name="settings-panel" class="overlay is-hidden">
+            <ui:VisualElement class="overlay-card">
+                <ui:Label name="settings-heading" class="overlay-heading" text="SETTINGS" />
+                <ui:VisualElement class="divider" picking-mode="Ignore" />
+
+                <ui:Slider name="volume-slider" class="setting-slider" label="MASTER VOLUME" low-value="0" high-value="100" value="80" />
+                <ui:Label name="volume-value" class="setting-value" text="80%" />
+
+                <ui:Button name="settings-close-button" class="overlay-button" text="BACK" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ============================ controls overlay ============================ -->
+        <ui:VisualElement name="controls-panel" class="overlay is-hidden">
+            <ui:VisualElement class="overlay-card">
+                <ui:Label name="controls-heading" class="overlay-heading" text="CONTROLS" />
+                <ui:VisualElement class="divider" picking-mode="Ignore" />
+
+                <ui:VisualElement class="key-row">
+                    <ui:Label class="key" text="W A S D" />
+                    <ui:Label class="key-desc" text="MOVE" />
+                </ui:VisualElement>
+                <ui:VisualElement class="key-row">
+                    <ui:Label class="key" text="MOUSE" />
+                    <ui:Label class="key-desc" text="LOOK AROUND" />
+                </ui:VisualElement>
+                <ui:VisualElement class="key-row">
+                    <ui:Label class="key" text="F" />
+                    <ui:Label class="key-desc" text="FLASHLIGHT" />
+                </ui:VisualElement>
+                <ui:VisualElement class="key-row">
+                    <ui:Label class="key" text="SHIFT" />
+                    <ui:Label class="key-desc" text="SPRINT" />
+                </ui:VisualElement>
+                <ui:VisualElement class="key-row">
+                    <ui:Label class="key" text="SPACE" />
+                    <ui:Label class="key-desc" text="JUMP" />
+                </ui:VisualElement>
+
+                <ui:Button name="controls-close-button" class="overlay-button" text="BACK" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>
