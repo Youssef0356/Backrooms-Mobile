@@ -1,0 +1,425 @@
+/* =============================================================================
+   BACKROOMS MOBILE - Main menu
+   -----------------------------------------------------------------------------
+   Look: liminal / found footage. Sickly fluorescent yellow on damp concrete,
+   CRT scanlines, heavy vignette, monospaced terminal type.
+   The menu sits inside the level as a world space panel attached to the camera,
+   so every colour is kept translucent to let the backrooms show through.
+   ========================================================================== */
+
+.menu-root {
+    /* --- palette ------------------------------------------------------- */
+    --accent: rgb(223, 216, 118);            /* fluorescent yellow */
+    --accent-dim: rgb(136, 132, 72);
+    --accent-soft: rgba(223, 216, 118, 0.12);
+    --line: rgba(223, 216, 118, 0.20);
+    --panel: rgba(9, 10, 5, 0.72);
+    --text: rgb(228, 224, 178);
+    --muted: rgba(228, 224, 178, 0.50);
+    --danger: rgb(196, 92, 74);
+
+    flex-grow: 1;
+    position: relative;
+    color: var(--text);
+    background-color: rgba(5, 6, 3, 0.22);
+}
+
+/* ============================== text ============================== */
+
+/* The default runtime theme draws a hard drop shadow under every text. On a
+   world space panel the shadow shows up as a second, offset copy of the text,
+   so it is switched off here and replaced by the glow on the title. */
+.menu-root Label,
+.menu-root Button,
+.menu-root Slider {
+    text-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* ============================== screen effects ============================== */
+
+.fx-scrim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    /* left-side scrim baked into a texture: USS has no gradient functions */
+    background-image: url("../Art/UI/scrim.png");
+}
+
+.fx-scanlines {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    /* 1px line / 3px gap scanlines + flat base baked into a texture
+       (USS has no repeating-linear-gradient support) */
+    background-image: url("../Art/UI/scanlines.png");
+}
+
+.fx-vignette {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    /* radial edge darkening baked into a texture (USS has no gradient
+       functions); the old flat rgba(0,0,0,0.18) base is merged into it */
+    background-image: url("../Art/UI/vignette.png");
+}
+
+/* ============================== left column ================================ */
+
+.left-column {
+    position: absolute;
+    left: 64px;
+    top: 0;
+    bottom: 0;
+    width: 580px;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.eyebrow {
+    font-size: 13px;
+    letter-spacing: 5px;
+    color: var(--accent-dim);
+    -unity-text-align: middle-left;
+    margin-bottom: 10px;
+}
+
+.title {
+    font-size: 78px;
+    letter-spacing: 10px;
+    -unity-font-style: bold;
+    color: var(--accent);
+    -unity-text-align: middle-left;
+}
+
+/* the only glow in the menu */
+.menu-root .title {
+    text-shadow: 0 0 22px rgba(223, 216, 118, 0.30);
+}
+
+.subtitle {
+    font-size: 22px;
+    letter-spacing: 9px;
+    color: var(--muted);
+    -unity-text-align: middle-left;
+    margin-top: 2px;
+}
+
+.divider {
+    height: 1px;
+    background-color: var(--line);
+    margin-top: 22px;
+    margin-bottom: 10px;
+}
+
+/* ============================== menu buttons =============================== */
+
+.menu-list {
+    flex-direction: column;
+}
+
+.menu-item {
+    flex-direction: row;
+    align-items: center;
+    height: 50px;
+}
+
+.menu-item-marker {
+    width: 28px;
+    font-size: 22px;
+    color: rgba(223, 216, 118, 0);
+    -unity-text-align: middle-center;
+    transition-property: color, translate;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.menu-item:hover .menu-item-marker,
+.menu-item.is-active .menu-item-marker {
+    color: var(--accent);
+    translate: 4px 0;
+}
+
+.menu-root .menu-button {
+    flex-grow: 1;
+    height: 46px;
+    padding-left: 18px;
+    font-size: 23px;
+    letter-spacing: 6px;
+    -unity-font-style: bold;
+    color: var(--text);
+    background-color: rgba(223, 216, 118, 0.05);
+    background-image: none;
+    border-width: 0;
+    border-left-width: 2px;
+    border-left-color: rgba(223, 216, 118, 0.30);
+    -unity-text-align: middle-left;
+    transition-property: background-color, color, translate, border-left-color;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.menu-root .menu-button:hover {
+    background-color: rgba(223, 216, 118, 0.16);
+    border-left-color: var(--accent);
+    color: var(--accent);
+    translate: 8px 0;
+}
+
+.menu-root .menu-button:focus {
+    background-color: rgba(223, 216, 118, 0.20);
+    border-left-color: var(--accent);
+    color: var(--accent);
+}
+
+.menu-root .menu-button:active {
+    background-color: rgba(223, 216, 118, 0.30);
+    color: rgb(12, 12, 6);
+}
+
+.menu-root .menu-button--danger {
+    color: rgba(228, 224, 178, 0.72);
+}
+
+.menu-root .menu-button--danger:hover {
+    background-color: rgba(196, 92, 74, 0.18);
+    border-left-color: var(--danger);
+    color: var(--danger);
+}
+
+.menu-root .menu-button--danger:focus {
+    background-color: rgba(196, 92, 74, 0.22);
+    border-left-color: var(--danger);
+    color: var(--danger);
+}
+
+.hint {
+    margin-top: 26px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(228, 224, 178, 0.32);
+    -unity-text-align: middle-left;
+}
+
+/* ============================== version (top right) ========================= */
+
+.version-block {
+    position: absolute;
+    top: 34px;
+    right: 46px;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.version-rule {
+    width: 190px;
+    height: 1px;
+    background-color: var(--line);
+    margin-bottom: 10px;
+}
+
+.version-label {
+    font-size: 26px;
+    letter-spacing: 4px;
+    -unity-font-style: bold;
+    color: var(--accent);
+    -unity-text-align: upper-right;
+}
+
+.build-label {
+    margin-top: 3px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    -unity-text-align: upper-right;
+}
+
+/* ============================== status (bottom left) ======================== */
+
+.status-block {
+    position: absolute;
+    bottom: 30px;
+    left: 64px;
+    flex-direction: column;
+}
+
+.rec-label {
+    font-size: 13px;
+    letter-spacing: 5px;
+    -unity-font-style: bold;
+    color: rgba(196, 92, 74, 0.85);
+}
+
+.hum-label {
+    margin-top: 4px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(228, 224, 178, 0.28);
+}
+
+/* ============================== overlays =================================== */
+
+.overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(4, 5, 2, 0.80);
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay.is-hidden {
+    display: none;
+}
+
+.overlay-card {
+    width: 540px;
+    padding-top: 26px;
+    padding-bottom: 26px;
+    padding-left: 32px;
+    padding-right: 32px;
+    background-color: var(--panel);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-color: var(--line);
+    flex-direction: column;
+}
+
+.overlay-heading {
+    font-size: 26px;
+    letter-spacing: 8px;
+    -unity-font-style: bold;
+    color: var(--accent);
+    -unity-text-align: middle-left;
+}
+
+.menu-root .overlay-button {
+    margin-top: 26px;
+    height: 44px;
+    font-size: 20px;
+    letter-spacing: 6px;
+    -unity-font-style: bold;
+    color: var(--text);
+    background-color: rgba(223, 216, 118, 0.05);
+    background-image: none;
+    border-width: 0;
+    border-left-width: 2px;
+    border-left-color: rgba(223, 216, 118, 0.30);
+    -unity-text-align: middle-left;
+    padding-left: 18px;
+    transition-property: background-color, color, border-left-color;
+    transition-duration: 0.12s;
+}
+
+.menu-root .overlay-button:hover {
+    background-color: rgba(223, 216, 118, 0.16);
+    border-left-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ============================== settings =================================== */
+
+.setting-slider {
+    width: 100%;
+    margin-top: 14px;
+}
+
+.setting-value {
+    margin-top: 2px;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    -unity-text-align: upper-right;
+}
+
+/* graphics dropdown, styled to match the slider rows */
+.setting-dropdown {
+    margin-top: 16px;
+    width: 100%;
+}
+
+.setting-dropdown .unity-base-field__label {
+    letter-spacing: 3px;
+    color: var(--text);
+}
+
+.setting-dropdown .unity-base-popup-field__input {
+    background-color: rgba(223, 216, 118, 0.05);
+    border-width: 0;
+    border-left-width: 2px;
+    border-left-color: rgba(223, 216, 118, 0.30);
+    padding-left: 12px;
+}
+
+.setting-dropdown .unity-base-popup-field__text {
+    color: var(--accent);
+    letter-spacing: 3px;
+}
+
+/* popup list items, in case the default theme popup is light */
+.unity-dropdown__item {
+    background-color: rgba(4, 5, 2, 0.95);
+    color: var(--text);
+    letter-spacing: 2px;
+}
+
+.unity-dropdown__item:hover,
+.unity-dropdown__item--selected {
+    background-color: rgba(223, 216, 118, 0.16);
+    color: var(--accent);
+}
+
+/* tint the default runtime theme slider to match the palette */
+.setting-slider .unity-base-slider__tracker {
+    background-color: rgba(223, 216, 118, 0.16);
+    height: 4px;
+}
+
+.setting-slider .unity-base-slider__dragger {
+    width: 14px;
+    height: 20px;
+    background-color: var(--accent);
+    border-width: 0;
+}
+
+.setting-slider .unity-base-slider__dragger-border {
+    width: 16px;
+    height: 22px;
+    border-width: 1px;
+    border-color: rgba(223, 216, 118, 0.55);
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ============================== controls =================================== */
+
+.key-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 12px;
+}
+
+.key {
+    width: 150px;
+    font-size: 16px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    color: var(--accent);
+    -unity-text-align: middle-left;
+}
+
+.key-desc {
+    flex-grow: 1;
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    -unity-text-align: middle-left;
+}

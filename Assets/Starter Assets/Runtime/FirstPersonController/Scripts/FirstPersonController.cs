@@ -74,6 +74,9 @@ namespace StarterAssets
 
 		private const float _threshold = 0.01f;
 
+		// Backrooms: look sensitivity chosen in the menu (PlayerPrefs key written by GameSettings)
+		private float _sensitivity = 1f;
+
 		private bool IsCurrentDeviceMouse
 		{
 			get
@@ -88,6 +91,8 @@ namespace StarterAssets
 
 		private void Awake()
 		{
+			_sensitivity = Mathf.Clamp(PlayerPrefs.GetFloat("backrooms.sensitivity", 1f), 0.1f, 2f);
+
 			// get a reference to our main camera
 			if (_mainCamera == null)
 			{
@@ -137,8 +142,8 @@ namespace StarterAssets
 				//Don't multiply mouse input by Time.deltaTime
 				float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
 				
-				_cinemachineTargetPitch += _input.look.y * RotationSpeed * deltaTimeMultiplier;
-				_rotationVelocity = _input.look.x * RotationSpeed * deltaTimeMultiplier;
+				_cinemachineTargetPitch += _input.look.y * RotationSpeed * deltaTimeMultiplier * _sensitivity;
+				_rotationVelocity = _input.look.x * RotationSpeed * deltaTimeMultiplier * _sensitivity;
 
 				// clamp our pitch rotation
 				_cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);

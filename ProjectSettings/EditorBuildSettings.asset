@@ -6,10 +6,10 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/UI/Menu.unity
+    path: Assets/_Project/Scenes/Menu.unity
     guid: f2b267a0cbaa95e47953557c28b3b5db
   - enabled: 1
-    path: Assets/Level/MainLevel.unity
+    path: Assets/_Project/Scenes/MainLevel.unity
     guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}

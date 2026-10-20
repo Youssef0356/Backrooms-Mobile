@@ -1,0 +1,30 @@
+fileFormatVersion: 2
+guid: 5e16b96f3bf827f45a77f0617868dee2
+AssetOrigin:
+  serializedVersion: 1
+  productId: 323663
+  packageName: The Backrooms - Music and Ambience (Vol. 1)
+  packageVersion: 1.0
+  assetPath: Assets/The Backrooms Music Vol. 1/juanjo_ sound - paradise.wav
+  uploadId: 764987
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 8
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 2
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 0.7
+    conversionMode: 0
+    preloadAudioData: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
