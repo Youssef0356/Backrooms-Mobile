@@ -289,7 +289,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7140694399045626294, guid: 7d001cacf887eb14cbf269a09e3ec3ba, type: 3}
       propertyPath: LookMagnitudeMultiplier
-      value: 0.2
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 7921911991004155457, guid: 7d001cacf887eb14cbf269a09e3ec3ba, type: 3}
       propertyPath: playerInput
@@ -2658,6 +2658,66 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!1 &7051110002223334451
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7051110002223334452}
+  - component: {fileID: 7051110002223334453}
+  m_Layer: 0
+  m_Name: PauseMenu
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7051110002223334452
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7051110002223334451}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7051110002223334453
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7051110002223334451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbfa4a75cbe1213f623ba6eddaf3b98f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PauseMenuController
+  pauseTimeScale: 0
+  pauseOnEscape: 1
+  pauseOnGamepadStart: 1
+  unlockCursorWhenPaused: 1
+  exitMode: 0
+  menuSceneName: Menu
+  showSoundSlider: 1
+  showMusicSlider: 1
+  showPauseButton: 1
+  pauseButtonLabel: II
+  headingLabel: PAUSED
+  pausedSubtitle: SIGNAL SUSPENDED
+  resumeLabel: RESUME
+  exitLabel: EXIT TO MENU
+  uiFont: {fileID: 12800000, guid: f60718293a4b5c6d7e8f90a1b2c3d4e5, type: 3}
+  fontResourcePath: Fonts/RobotoMono-Regular
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2671,3 +2731,4 @@ SceneRoots:
   - {fileID: 1825455912}
   - {fileID: 1692274899}
   - {fileID: 1977956995}
+  - {fileID: 7051110002223334452}

@@ -1,6 +1,8 @@
+using System;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.PackageManager;
+using UnityEditor.PackageManager.Requests;
 using UnityEngine;
 using UnityEngine.Rendering;
 #if USE_URP
@@ -14,7 +16,12 @@ namespace StarterAssets
         [InitializeOnLoadMethod]
         static void OnInitialize()
         {
-            URPCheck();
+            // Scripts also load inside asset import worker processes; never run there.
+            if (AssetDatabase.IsAssetImportWorkerProcess())
+                return;
+
+            // Defer until the Editor is ready so package manager requests can progress.
+            EditorApplication.delayCall += URPCheck;
         }
 
         static void URPCheck()
@@ -23,23 +30,40 @@ namespace StarterAssets
                 return;
 
             var request = Client.List();
-            while (!request.IsCompleted) { }
 
-            if (request.Status != StatusCode.Success)
-                return;
-
-            if (request.Result.All(info => info.name != "com.unity.render-pipelines.universal"))
+            // Never busy-wait on request.IsCompleted here: it blocks the main thread,
+            // which prevents the package manager from ever completing the request
+            // and freezes the whole Editor.
+            WhenComplete(request, () =>
             {
-                var addRequest = Client.Add("com.unity.render-pipelines.universal");
+                if (request.Status != StatusCode.Success)
+                    return;
 
-                while (!addRequest.IsCompleted) { }
+                if (request.Result.All(info => info.name != "com.unity.render-pipelines.universal"))
+                {
+                    var addRequest = Client.Add("com.unity.render-pipelines.universal");
+                    WhenComplete(addRequest, () => Client.Resolve());
+                }
+                else
+                {
+                    FindAndAssignPipeline();
+                }
+            });
+        }
 
-                Client.Resolve();
-            }
-            else
+        /// Polls a package manager request from the Editor update loop and invokes
+        /// <paramref name="onCompleted"/> once it is done.
+        static void WhenComplete<T>(Request<T> request, Action onCompleted)
+        {
+            void Poll()
             {
-                FindAndAssignPipeline();
+                if (request == null || !request.IsCompleted) return;
+                EditorApplication.update -= Poll;
+                onCompleted?.Invoke();
             }
+
+            if (request != null && request.IsCompleted) Poll();
+            else EditorApplication.update += Poll;
         }
 
 #if USE_URP

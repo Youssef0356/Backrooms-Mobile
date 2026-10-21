@@ -68,6 +68,13 @@ public class BackroomsAmbience : MonoBehaviour
         playing = false;
     }
 
+    /// Live-updates the playback volume (used by the pause menu's MUSIC slider).
+    public void SetVolume(float value)
+    {
+        volume = Mathf.Clamp01(value);
+        if (source != null) source.volume = volume;
+    }
+
     IEnumerator PlayRoutine()
     {
         int remaining = clips.Length;          // one full pass when loopList is off

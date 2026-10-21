@@ -1,0 +1,198 @@
+/* =============================================================================
+   BACKROOMS MOBILE - In-game pause menu
+   -----------------------------------------------------------------------------
+   Same liminal / found footage look as "Menu Style.uss" (fluorescent yellow on
+   damp concrete, monospaced terminal type) but built for a full screen overlay
+   inside the game level. Lives in a Resources folder so PauseMenuController
+   loads it at runtime with Resources.Load<StyleSheet>("Pause menu style").
+   ========================================================================== */
+
+.pause-root {
+    /* --- palette (matches Menu Style.uss) -------------------------------- */
+    --accent: rgb(223, 216, 118);            /* fluorescent yellow */
+    --accent-dim: rgb(136, 132, 72);
+    --line: rgba(223, 216, 118, 0.20);
+    --panel: rgba(9, 10, 5, 0.78);
+    --text: rgb(228, 224, 178);
+    --muted: rgba(228, 224, 178, 0.50);
+    --danger: rgb(196, 92, 74);
+
+    flex-grow: 1;
+    color: var(--text);
+}
+
+/* the default runtime theme draws a drop shadow under text; drop it here */
+.pause-root Label,
+.pause-root Button,
+.pause-root Slider {
+    text-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* ============================== pause button (corner) ===================== */
+
+.pause-fab {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: var(--accent);
+    background-color: rgba(9, 10, 5, 0.55);
+    background-image: none;
+    border-width: 1px;
+    border-color: var(--line);
+    border-radius: 6px;
+    transition-property: background-color;
+    transition-duration: 0.12s;
+}
+
+.pause-fab:hover {
+    background-color: rgba(223, 216, 118, 0.16);
+}
+
+/* ============================== overlay =================================== */
+
+.pause-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(4, 5, 2, 0.80);
+    align-items: center;
+    justify-content: center;
+}
+
+.pause-overlay.is-hidden {
+    display: none;
+}
+
+.pause-card {
+    width: 560px;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    padding-left: 34px;
+    padding-right: 34px;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--line);
+    flex-direction: column;
+}
+
+.pause-heading {
+    font-size: 30px;
+    letter-spacing: 10px;
+    -unity-font-style: bold;
+    color: var(--accent);
+    -unity-text-align: middle-center;
+}
+
+.pause-subheading {
+    margin-top: 4px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    letter-spacing: 5px;
+    color: var(--muted);
+    -unity-text-align: middle-center;
+}
+
+.pause-divider {
+    height: 1px;
+    background-color: var(--line);
+    margin-top: 14px;
+    margin-bottom: 4px;
+}
+
+/* ============================== buttons =================================== */
+
+.pause-button {
+    margin-top: 16px;
+    height: 50px;
+    font-size: 20px;
+    letter-spacing: 6px;
+    -unity-font-style: bold;
+    color: var(--text);
+    background-color: rgba(223, 216, 118, 0.05);
+    background-image: none;
+    border-width: 0;
+    border-left-width: 2px;
+    border-left-color: rgba(223, 216, 118, 0.30);
+    -unity-text-align: middle-left;
+    padding-left: 18px;
+    transition-property: background-color, color, border-left-color;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.pause-button:hover,
+.pause-button:focus {
+    background-color: rgba(223, 216, 118, 0.16);
+    border-left-color: var(--accent);
+    color: var(--accent);
+}
+
+.pause-button--danger {
+    color: rgba(228, 224, 178, 0.72);
+}
+
+.pause-button--danger:hover,
+.pause-button--danger:focus {
+    background-color: rgba(196, 92, 74, 0.18);
+    border-left-color: var(--danger);
+    color: var(--danger);
+}
+
+/* ============================== settings rows ============================= */
+
+.pause-setting {
+    margin-top: 14px;
+}
+
+.pause-setting-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.pause-setting-label {
+    flex-grow: 1;
+    font-size: 16px;
+    letter-spacing: 4px;
+    color: var(--text);
+}
+
+.pause-setting-value {
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    -unity-text-align: upper-right;
+}
+
+.pause-slider {
+    width: 100%;
+    margin-top: 4px;
+}
+
+/* tint the default runtime theme slider to match the palette */
+.pause-slider .unity-base-slider__tracker {
+    background-color: rgba(223, 216, 118, 0.16);
+    height: 4px;
+}
+
+.pause-slider .unity-base-slider__dragger {
+    width: 14px;
+    height: 20px;
+    background-color: var(--accent);
+    border-width: 0;
+}
+
+.pause-slider .unity-base-slider__dragger-border {
+    width: 16px;
+    height: 22px;
+    border-width: 1px;
+    border-color: rgba(223, 216, 118, 0.55);
+    background-color: rgba(0, 0, 0, 0);
+}

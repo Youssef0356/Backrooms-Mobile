@@ -112,3 +112,6 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Local build output (APK + IL2CPP backup folder, hundreds of MB)
+/[Ss]hipping/
