@@ -24,6 +24,10 @@ public class VillainAI : MonoBehaviour
     [Header("Catch")]
     public float catchDistance = 1.2f;
 
+    [Header("Animation")]
+    public float walkAnimReferenceSpeed = 1.4f;  // ground speed the walk clip was authored at (lower = faster playback)
+    public float runAnimReferenceSpeed = 3.5f;   // ground speed the run clip was authored at
+
     [Header("Repositioning (keeps him near the player)")]
     public bool enableTeleport = true;
     public float maxDistanceFromPlayer = 40f;   // if he drifts beyond this, he teleports back
@@ -38,6 +42,7 @@ public class VillainAI : MonoBehaviour
     State state = State.Wander;
 
     NavMeshAgent agent;
+    Animator anim;
     float waitTimer;
     float lostTimer;
     float teleportTimer;
@@ -46,6 +51,8 @@ public class VillainAI : MonoBehaviour
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+        anim = GetComponentInChildren<Animator>();
+        SetChasing(false);                      // the controller defaults IsChasing to true
 
         if (player == null)
         {
@@ -63,6 +70,7 @@ public class VillainAI : MonoBehaviour
         if (player == null) return;
 
         CheckReposition();
+        SyncAnimationSpeed();
 
         bool canSee = CanSeePlayer();
 
@@ -71,6 +79,7 @@ public class VillainAI : MonoBehaviour
             if (canSee)
             {
                 state = State.Chase;
+                SetChasing(true);
                 agent.speed = chaseSpeed;
                 lostTimer = 0f;
                 return;
@@ -97,6 +106,7 @@ public class VillainAI : MonoBehaviour
             if (lostTimer >= loseSightTime)
             {
                 state = State.Wander;
+                SetChasing(false);
                 agent.speed = wanderSpeed;
                 GoToRandomPoint();
             }
@@ -132,6 +142,26 @@ public class VillainAI : MonoBehaviour
         {
             agent.SetDestination(navHit.position);
         }
+    }
+
+    // ---------------- Animation ----------------
+
+    void SetChasing(bool value)
+    {
+        if (anim != null) anim.SetBool("IsChasing", value);
+    }
+
+    /// Keeps the playback rate in step with the agent's real ground speed so
+    /// the feet never slide (moonwalk) or stutter when the speed changes.
+    void SyncAnimationSpeed()
+    {
+        if (anim == null) return;
+
+        float reference = state == State.Chase ? runAnimReferenceSpeed : walkAnimReferenceSpeed;
+        if (reference < 0.1f) reference = 0.1f;
+
+        // tiny floor so transitions keep progressing while he stands still
+        anim.speed = Mathf.Clamp(agent.velocity.magnitude / reference, 0.05f, 3f);
     }
 
     // ---------------- Teleport back near the player ----------------
@@ -193,6 +223,7 @@ public class VillainAI : MonoBehaviour
 
         agent.Warp(chosen);
         state = State.Wander;
+        SetChasing(false);
         agent.speed = wanderSpeed;
         waitTimer = 0f;
         lostTimer = 0f;
