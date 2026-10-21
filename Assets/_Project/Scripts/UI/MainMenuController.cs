@@ -28,6 +28,10 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] bool flickerEffect = true;
     [SerializeField] float fadeOutDuration = 0.35f;
 
+    [Header("Music")]
+    [Tooltip("A random track from Resources/SFX plays on loop in the menu. Clips whose name contains this fragment are skipped, so the level's own soundtrack is not used here.")]
+    [SerializeField] string levelSoundtrackName = "backrooms level0";
+
     UIDocument document;
     VisualElement root;
 
@@ -58,6 +62,7 @@ public class MainMenuController : MonoBehaviour
 
     string titleText;
     Coroutine flickerRoutine;
+    AudioSource menuMusic;
 
     void Awake()
     {
@@ -98,6 +103,7 @@ public class MainMenuController : MonoBehaviour
         FillVersionBlock();
         WireButtons();
         WireSettings();
+        StartMenuMusic();
 
         if (typingEffect && titleLabel != null) StartCoroutine(TypeTitle());
         if (flickerEffect) flickerRoutine = StartCoroutine(Flicker());
@@ -107,6 +113,8 @@ public class MainMenuController : MonoBehaviour
     {
         if (flickerRoutine != null) StopCoroutine(flickerRoutine);
         flickerRoutine = null;
+
+        if (menuMusic != null) menuMusic.Stop();
     }
 
     // ------------------------------------------------------------------ look
@@ -211,8 +219,43 @@ public class MainMenuController : MonoBehaviour
         {
             float value = Mathf.Clamp01(evt.newValue / 100f);
             GameSettings.SetMusicVolume(value);
+            if (menuMusic != null) menuMusic.volume = value;
             UpdatePercentLabel(musicValueLabel, value);
         });
+    }
+
+    /// Picks one of the non-level tracks at random and loops it under the menu.
+    void StartMenuMusic()
+    {
+        if (menuMusic != null)
+        {
+            if (!menuMusic.isPlaying) menuMusic.Play();
+            return;
+        }
+
+        AudioClip[] all = Resources.LoadAll<AudioClip>("SFX");
+
+        List<AudioClip> pool = new List<AudioClip>();
+        foreach (AudioClip clip in all)
+        {
+            if (clip == null) continue;
+
+            bool isLevelTrack = !string.IsNullOrEmpty(levelSoundtrackName) &&
+                clip.name.IndexOf(levelSoundtrackName, System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (!isLevelTrack) pool.Add(clip);
+        }
+
+        if (pool.Count == 0) pool.AddRange(all);   // nothing left: fall back to every clip
+        if (pool.Count == 0) return;
+
+        menuMusic = gameObject.AddComponent<AudioSource>();
+        menuMusic.clip = pool[Random.Range(0, pool.Count)];
+        menuMusic.loop = true;
+        menuMusic.playOnAwake = false;
+        menuMusic.spatialBlend = 0f;
+        menuMusic.volume = GameSettings.MusicVolume;
+        menuMusic.Play();
     }
 
     void WireSensitivity()

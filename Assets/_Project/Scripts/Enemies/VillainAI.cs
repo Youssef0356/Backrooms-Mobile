@@ -28,6 +28,12 @@ public class VillainAI : MonoBehaviour
     public float walkAnimReferenceSpeed = 1.4f;  // ground speed the walk clip was authored at (lower = faster playback)
     public float runAnimReferenceSpeed = 3.5f;   // ground speed the run clip was authored at
 
+    [Header("Attack (optional)")]
+    [Tooltip("Starts swinging when the player is closer than this while chasing.")]
+    public float attackDistance = 2.6f;
+    [Tooltip("Seconds between swings.")]
+    public float attackCooldown = 1.5f;
+
     [Header("Repositioning (keeps him near the player)")]
     public bool enableTeleport = true;
     public float maxDistanceFromPlayer = 40f;   // if he drifts beyond this, he teleports back
@@ -36,7 +42,10 @@ public class VillainAI : MonoBehaviour
     public float teleportCooldown = 10f;        // min seconds between teleports
     [Range(1, 30)] public int teleportAttempts = 12; // random spots to try per teleport
     public float teleportSampleRadius = 3f;     // how far a spot may snap onto the NavMesh
-    public bool avoidVisibleSpots = true;       // prefer spots hidden behind walls from the player
+    [Tooltip("Only land where the player cannot see him. If no such spot exists the teleport is postponed, so he never pops into view.")]
+    public bool avoidVisibleSpots = true;
+    [Tooltip("Half-angle (degrees) of the cone the player is considered to be looking at. Spots outside it count as unseen.")]
+    public float playerSightHalfAngle = 60f;
 
     enum State { Wander, Chase }
     State state = State.Wander;
@@ -46,12 +55,21 @@ public class VillainAI : MonoBehaviour
     float waitTimer;
     float lostTimer;
     float teleportTimer;
+    float attackTimer;
     bool hasTeleported;
+    bool hasCaught;
+
+    // Animator parameters actually present in the controller. Rigs differ
+    // (the old Bacteria uses IsChasing only, Clark uses Speed + attack triggers),
+    // so everything is optional and only driven when it exists.
+    bool hasSpeed, hasChasing, hasAttack1, hasAttack2;
+    int speedHash, chasingHash, attack1Hash, attack2Hash;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         anim = GetComponentInChildren<Animator>();
+        CacheAnimatorParameters();
         SetChasing(false);                      // the controller defaults IsChasing to true
 
         if (player == null)
@@ -82,6 +100,7 @@ public class VillainAI : MonoBehaviour
                 SetChasing(true);
                 agent.speed = chaseSpeed;
                 lostTimer = 0f;
+                attackTimer = 0f;
                 return;
             }
 
@@ -115,6 +134,11 @@ public class VillainAI : MonoBehaviour
             {
                 OnCaughtPlayer();
             }
+            else
+            {
+                hasCaught = false;
+                UpdateAttack();
+            }
         }
     }
 
@@ -146,9 +170,26 @@ public class VillainAI : MonoBehaviour
 
     // ---------------- Animation ----------------
 
+    void CacheAnimatorParameters()
+    {
+        hasSpeed = hasChasing = hasAttack1 = hasAttack2 = false;
+        if (anim == null || anim.runtimeAnimatorController == null) return;
+
+        foreach (AnimatorControllerParameter p in anim.parameters)
+        {
+            switch (p.name)
+            {
+                case "Speed":     hasSpeed = true;     speedHash = p.nameHash;     break;
+                case "IsChasing": hasChasing = true;   chasingHash = p.nameHash;   break;
+                case "Attack1":   hasAttack1 = true;   attack1Hash = p.nameHash;   break;
+                case "Attack2":   hasAttack2 = true;   attack2Hash = p.nameHash;   break;
+            }
+        }
+    }
+
     void SetChasing(bool value)
     {
-        if (anim != null) anim.SetBool("IsChasing", value);
+        if (anim != null && hasChasing) anim.SetBool(chasingHash, value);
     }
 
     /// Keeps the playback rate in step with the agent's real ground speed so
@@ -157,11 +198,37 @@ public class VillainAI : MonoBehaviour
     {
         if (anim == null) return;
 
+        float groundSpeed = agent.velocity.magnitude;
+
+        // Controllers with an Idle/Walk/Run blend read the speed themselves.
+        if (hasSpeed)
+        {
+            anim.speed = 1f;
+            anim.SetFloat(speedHash, groundSpeed);
+            return;
+        }
+
         float reference = state == State.Chase ? runAnimReferenceSpeed : walkAnimReferenceSpeed;
         if (reference < 0.1f) reference = 0.1f;
 
         // tiny floor so transitions keep progressing while he stands still
-        anim.speed = Mathf.Clamp(agent.velocity.magnitude / reference, 0.05f, 3f);
+        anim.speed = Mathf.Clamp(groundSpeed / reference, 0.05f, 3f);
+    }
+
+    /// Swings when he is close but not yet on top of the player.
+    void UpdateAttack()
+    {
+        if (anim == null || (!hasAttack1 && !hasAttack2)) return;
+
+        attackTimer -= Time.deltaTime;
+        if (attackTimer > 0f) return;
+
+        if (Vector3.Distance(transform.position, player.position) > attackDistance) return;
+
+        attackTimer = attackCooldown + Random.Range(0f, 0.35f);
+
+        if (hasAttack2 && (!hasAttack1 || Random.value < 0.5f)) anim.SetTrigger(attack2Hash);
+        else anim.SetTrigger(attack1Hash);
     }
 
     // ---------------- Teleport back near the player ----------------
@@ -183,11 +250,38 @@ public class VillainAI : MonoBehaviour
 
     void TeleportNearPlayer()
     {
+        if (!TryFindTeleportSpot(out Vector3 chosen))
+        {
+            // Every candidate would land in view: wait for the next cooldown
+            // instead of popping into the player's sight.
+            teleportTimer = 0f;
+            return;
+        }
+
+        agent.Warp(chosen);
+        state = State.Wander;
+        SetChasing(false);
+        agent.speed = wanderSpeed;
+        waitTimer = 0f;
+        lostTimer = 0f;
+        teleportTimer = 0f;
+        hasTeleported = true;
+        GoToRandomPoint();
+
+#if UNITY_EDITOR
+        Debug.Log("VillainAI: repositioned near the player (unseen).");
+#endif
+    }
+
+    /// Finds a NavMesh spot at teleportRange from the player that he cannot
+    /// currently see. Returns false when every candidate would be in view, so the
+    /// caller can postpone instead of teleporting in plain sight.
+    bool TryFindTeleportSpot(out Vector3 spot)
+    {
+        spot = Vector3.zero;
+
         Vector3 playerPos = player.position;
-        Vector3 fallback = Vector3.zero;
-        bool foundFallback = false;
-        Vector3 chosen = Vector3.zero;
-        bool found = false;
+        float minDist = teleportRange.x * 0.6f;
 
         for (int i = 0; i < teleportAttempts; i++)
         {
@@ -202,53 +296,41 @@ public class VillainAI : MonoBehaviour
 
             // Never land on top of the player (NavMesh snapping may have moved the spot closer)
             float flatDist = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(playerPos.x, playerPos.z));
-            if (flatDist < teleportRange.x * 0.6f) continue;
+            if (flatDist < minDist) continue;
 
-            if (!foundFallback) { fallback = pos; foundFallback = true; }
+            if (avoidVisibleSpots && IsSpotVisibleToPlayer(pos)) continue;
 
-            // Prefer a spot the player can't currently see, so he doesn't pop into view
-            if (!avoidVisibleSpots || !SpotIsVisibleToPlayer(pos))
-            {
-                chosen = pos;
-                found = true;
-                break;
-            }
+            spot = pos;
+            return true;
         }
 
-        if (!found)
-        {
-            if (!foundFallback) return;         // no valid NavMesh spot found; retry next cooldown
-            chosen = fallback;
-        }
-
-        agent.Warp(chosen);
-        state = State.Wander;
-        SetChasing(false);
-        agent.speed = wanderSpeed;
-        waitTimer = 0f;
-        lostTimer = 0f;
-        teleportTimer = 0f;
-        hasTeleported = true;
-        GoToRandomPoint();
-
-        Debug.Log("VillainAI: repositioned near the player.");
+        return false;
     }
 
-    bool SpotIsVisibleToPlayer(Vector3 spot)
+    /// Visible = inside the cone the player is facing AND with a clear line of
+    /// sight. Spots behind him or around a corner are safe, which is exactly what
+    /// makes the teleport invisible.
+    bool IsSpotVisibleToPlayer(Vector3 spot)
     {
-        Vector3 from = player.position + Vector3.up * 1.5f;
-        Vector3 to = spot + Vector3.up * 1.5f;
-        Vector3 dir = to - from;
+        Vector3 eyes = player.position + Vector3.up * eyeHeight;
+        Vector3 target = spot + Vector3.up * 1.1f;          // body height, not the floor
+        Vector3 dir = target - eyes;
 
-        if (Physics.Raycast(from, dir.normalized, out RaycastHit hit, dir.magnitude, ~0, QueryTriggerInteraction.Ignore))
-        {
-            return hit.transform == player || hit.transform.IsChildOf(player) || player.IsChildOf(hit.transform);
-        }
-        return false;                           // something is in the way = hidden
+        if (Vector3.Angle(player.forward, dir) > playerSightHalfAngle) return false;  // behind him
+
+        if (Physics.Raycast(eyes, dir.normalized, out _, dir.magnitude, ~0, QueryTriggerInteraction.Ignore))
+            return false;                                    // a wall hides him
+
+        return true;                                         // in the cone, nothing in the way
     }
 
     void OnCaughtPlayer()
     {
+        if (hasCaught) return;
+        hasCaught = true;
+
+        if (anim != null && hasAttack1) anim.SetTrigger(attack1Hash);
+
         // Put your game over / jumpscare / restart logic here.
         Debug.Log("Player caught!");
     }

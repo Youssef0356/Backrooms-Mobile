@@ -17,6 +17,14 @@ public class BackroomsAmbience : MonoBehaviour
     [Header("Clips (empty = auto-load everything from Resources/SFX)")]
     public AudioClip[] clips;
 
+    [Header("Main soundtrack")]
+    [Tooltip("Plays on loop instead of shuffling the list. Leave empty to auto-find it by name among the clips.")]
+    public AudioClip mainClip;
+    [Tooltip("Name fragment used to find the main soundtrack when Main Clip is empty.")]
+    public string mainClipName = "backrooms level0";
+    [Tooltip("Loop the main soundtrack forever instead of playing it once.")]
+    public bool loopMainClip = true;
+
     [Header("Playback")]
     public bool playOnStart = true;
     public bool loopList = true;               // keep cycling forever
@@ -41,6 +49,11 @@ public class BackroomsAmbience : MonoBehaviour
 
         if (clips == null || clips.Length == 0)
             clips = Resources.LoadAll<AudioClip>("SFX");
+
+        // The level always opens on the backrooms level 0 track; the rest of the
+        // SFX folder is only used as a fallback / by the menu.
+        if (mainClip == null && !string.IsNullOrEmpty(mainClipName))
+            mainClip = FindClipByName(mainClipName);
     }
 
     void Start()
@@ -51,6 +64,17 @@ public class BackroomsAmbience : MonoBehaviour
     public void Play()
     {
         if (playing) return;
+
+        // Main soundtrack: one looping track, no shuffling.
+        if (mainClip != null)
+        {
+            source.clip = mainClip;
+            source.loop = loopMainClip;
+            source.Play();
+            playing = true;
+            return;
+        }
+
         if (clips == null || clips.Length == 0)
         {
             Debug.LogWarning("BackroomsAmbience: no audio clips found. " +
@@ -64,8 +88,23 @@ public class BackroomsAmbience : MonoBehaviour
     public void Stop()
     {
         StopAllCoroutines();
-        if (source != null) source.Stop();
+        if (source != null)
+        {
+            source.Stop();
+            source.loop = false;
+        }
         playing = false;
+    }
+
+    AudioClip FindClipByName(string fragment)
+    {
+        if (clips == null) return null;
+        foreach (AudioClip c in clips)
+        {
+            if (c != null && c.name.IndexOf(fragment, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return c;
+        }
+        return null;
     }
 
     /// Live-updates the playback volume (used by the pause menu's MUSIC slider).
@@ -77,6 +116,7 @@ public class BackroomsAmbience : MonoBehaviour
 
     IEnumerator PlayRoutine()
     {
+        source.loop = false;                   // the shuffle chains clips one at a time
         int remaining = clips.Length;          // one full pass when loopList is off
 
         while (loopList || remaining > 0)

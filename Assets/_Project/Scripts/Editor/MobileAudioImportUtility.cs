@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-/// One-click, mobile-friendly import settings for every audio clip in Assets/Resources/SFX.
+/// One-click, mobile-friendly import settings for every audio clip in Assets/_Project/Audio/Resources/SFX.
 ///
 /// - Short sounds  -> Decompress On Load (instant playback for SFX)
 /// - Long tracks   -> Streaming (no big memory spike on mobile)
@@ -10,7 +10,7 @@ using UnityEngine;
 /// Usage: Tools > Backrooms > Fix SFX Import Settings (Mobile)
 public static class MobileAudioImportUtility
 {
-    const string SfxFolder = "Assets/Resources/SFX";
+    const string SfxFolder = "Assets/_Project/Audio/Resources/SFX";
     const float StreamingLengthSeconds = 60f;   // clips at least this long stream from disk
 
     [MenuItem("Tools/Backrooms/Fix SFX Import Settings (Mobile)")]
