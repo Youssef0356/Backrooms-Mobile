@@ -30,12 +30,8 @@ namespace StarterAssets
 
     void DisableAutoSwitchControls()
     {
-        playerInput.neverAutoSwitchControlSchemes = true;
-    }
-
-    private void Update()
-    {
-        Debug.Log(playerInput.currentControlScheme);
+        if (playerInput != null)
+            playerInput.neverAutoSwitchControlSchemes = true;
     }
 
 #endif

@@ -1,0 +1,211 @@
+/* =============================================================================
+   BACKROOMS MOBILE - Victory (Escape) Screen Style
+   -----------------------------------------------------------------------------
+   Liminal / analog horror CRT terminal aesthetic for successful escape.
+   Terminal emergency green + pale fluorescent tones, scanlines, vignette,
+   and monospaced type matching Pause and GameOver screens.
+   ========================================================================== */
+
+.victory-root {
+    /* --- palette --- */
+    --success: rgb(72, 215, 120);             /* emergency exit green */
+    --success-bright: rgb(115, 245, 160);
+    --success-dim: rgb(35, 125, 68);
+    --success-line: rgba(72, 215, 120, 0.35);
+    --accent: rgb(223, 216, 118);             /* fluorescent yellow */
+    --accent-dim: rgb(136, 132, 72);
+    --panel-bg: rgba(5, 12, 8, 0.90);
+    --card-bg: rgba(7, 18, 12, 0.94);
+    --text: rgb(235, 245, 230);
+    --text-dim: rgba(235, 245, 230, 0.60);
+    --green-glow: rgba(72, 215, 120, 0.22);
+
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    flex-grow: 1;
+    color: var(--text);
+}
+
+.victory-root Label,
+.victory-root Button {
+    text-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* ============================== full-screen backdrop ===================== */
+
+.victory-backdrop {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(4, 10, 6, 0.88);
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.4s;
+    transition-timing-function: ease-out;
+}
+
+.victory-backdrop.is-visible {
+    opacity: 1;
+}
+
+/* CRT Scanlines and Vignette layers */
+.victory-vignette {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("../../Art/UI/vignette.png");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.victory-scanlines {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("../../Art/UI/scanlines.png");
+    -unity-background-scale-mode: repeat;
+    opacity: 0.60;
+}
+
+/* ============================== top status hud ============================ */
+
+.victory-rec-badge {
+    position: absolute;
+    top: 24px;
+    left: 32px;
+    font-size: 14px;
+    letter-spacing: 4px;
+    -unity-font-style: bold;
+    color: var(--success-bright);
+}
+
+.victory-channel-badge {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: var(--success-dim);
+}
+
+/* ============================== central modal card ======================== */
+
+.victory-card {
+    width: 600px;
+    max-width: 90%;
+    padding: 34px 40px;
+    background-color: var(--card-bg);
+    border-width: 1px;
+    border-color: var(--success-line);
+    flex-direction: column;
+}
+
+.victory-heading {
+    font-size: 32px;
+    letter-spacing: 10px;
+    -unity-font-style: bold;
+    color: var(--success-bright);
+    -unity-text-align: middle-center;
+}
+
+.victory-subheading {
+    margin-top: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    -unity-text-align: middle-center;
+}
+
+.victory-divider {
+    height: 1px;
+    background-color: var(--success-line);
+    margin-top: 10px;
+    margin-bottom: 18px;
+}
+
+/* ============================== stats block =============================== */
+
+.victory-stats-box {
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background-color: rgba(72, 215, 120, 0.05);
+    border-left-width: 2px;
+    border-left-color: var(--success);
+    flex-direction: column;
+}
+
+.victory-stat-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.victory-stat-label {
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+}
+
+.victory-stat-value {
+    font-size: 14px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    color: var(--accent);
+}
+
+.victory-stat-value--success {
+    color: var(--success-bright);
+}
+
+/* ============================== action buttons ============================ */
+
+.victory-button {
+    margin-top: 12px;
+    height: 52px;
+    font-size: 19px;
+    letter-spacing: 6px;
+    -unity-font-style: bold;
+    color: var(--text);
+    background-color: rgba(72, 215, 120, 0.08);
+    background-image: none;
+    border-width: 0;
+    border-left-width: 3px;
+    border-left-color: var(--success-dim);
+    -unity-text-align: middle-left;
+    padding-left: 20px;
+    transition-property: background-color, color, border-left-color;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.victory-button:hover,
+.victory-button:focus {
+    background-color: rgba(72, 215, 120, 0.25);
+    border-left-color: var(--success-bright);
+    color: var(--success-bright);
+}
+
+.victory-button--secondary {
+    color: var(--text-dim);
+    border-left-color: rgba(223, 216, 118, 0.25);
+    background-color: rgba(223, 216, 118, 0.04);
+}
+
+.victory-button--secondary:hover,
+.victory-button--secondary:focus {
+    background-color: rgba(223, 216, 118, 0.15);
+    border-left-color: var(--accent);
+    color: var(--accent);
+}

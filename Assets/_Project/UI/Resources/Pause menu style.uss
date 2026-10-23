@@ -54,6 +54,11 @@
     background-color: rgba(223, 216, 118, 0.16);
 }
 
+.flashlight-fab {
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
 /* ============================== overlay =================================== */
 
 .pause-overlay {

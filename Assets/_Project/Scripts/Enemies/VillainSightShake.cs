@@ -32,7 +32,8 @@ public class VillainSightShake : MonoBehaviour
         float target = 0f;
         if (CanSeePlayer(out float dist))
         {
-            target = maxAmplitude;
+            // Cap shake amplitude to 0.85 so the camera remains clear and playable
+            target = Mathf.Min(maxAmplitude, 0.85f);
             if (scaleWithDistance)
                 target *= Mathf.Lerp(1f, 0.3f, Mathf.Clamp01(dist / sightRange));
         }

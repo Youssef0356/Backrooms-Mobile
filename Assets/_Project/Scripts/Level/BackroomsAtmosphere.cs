@@ -14,16 +14,16 @@ using UnityEngine.Rendering.Universal;
 public class BackroomsAtmosphere : MonoBehaviour
 {
     [Header("Haze")]
-    [Tooltip("Warm distance fog. This is what makes corridors fade into nothing instead of ending in a wall.")]
+    [Tooltip("Dark distance fog. This makes corridors fade into eerie pitch-black shadows.")]
     [SerializeField] bool enableFog = true;
-    [SerializeField] Color fogColor = new Color(0.70f, 0.66f, 0.48f);
-    [SerializeField] float fogStartDistance = 6f;
-    [SerializeField] float fogEndDistance = 40f;
+    [SerializeField] Color fogColor = new Color(0.035f, 0.030f, 0.022f);
+    [SerializeField] float fogStartDistance = 4f;
+    [SerializeField] float fogEndDistance = 22f;
 
     [Header("Ambient")]
     [Tooltip("Replaces the blue-ish skybox ambient with a dim warm base, so the ceiling panels do the actual lighting.")]
     [SerializeField] bool overrideAmbient = true;
-    [SerializeField] Color ambientColor = new Color(0.19f, 0.18f, 0.12f);
+    [SerializeField] Color ambientColor = new Color(0.040f, 0.035f, 0.025f);
 
     [Header("Camera")]
     [Tooltip("URP post-processing is off on the level camera. Turning it on is what makes the grading / grain / bloom visible.")]
@@ -31,19 +31,19 @@ public class BackroomsAtmosphere : MonoBehaviour
     [SerializeField] bool enableAntiAliasing = true;
 
     [Header("Grade")]
-    [SerializeField] float postExposure = 0.15f;
-    [SerializeField] float contrast = 14f;
-    [SerializeField] float saturation = -12f;
-    [SerializeField] Color colourFilter = new Color(1f, 0.97f, 0.86f);
-    [SerializeField] float temperature = 12f;
-    [SerializeField] float tint = 4f;
+    [SerializeField] float postExposure = -0.40f;
+    [SerializeField] float contrast = 18f;
+    [SerializeField] float saturation = -14f;
+    [SerializeField] Color colourFilter = new Color(1f, 0.95f, 0.82f);
+    [SerializeField] float temperature = 10f;
+    [SerializeField] float tint = 3f;
 
     [Header("Lens")]
-    [SerializeField] float bloomIntensity = 0.6f;
-    [SerializeField] float bloomThreshold = 0.9f;
+    [SerializeField] float bloomIntensity = 0.5f;
+    [SerializeField] float bloomThreshold = 0.95f;
     [SerializeField] Color bloomTint = new Color(1f, 0.94f, 0.72f);
-    [SerializeField] float vignetteIntensity = 0.36f;
-    [SerializeField] float grainIntensity = 0.35f;
+    [SerializeField] float vignetteIntensity = 0.45f;
+    [SerializeField] float grainIntensity = 0.30f;
     [SerializeField] float chromaticAberration = 0.05f;
 
     Volume volume;

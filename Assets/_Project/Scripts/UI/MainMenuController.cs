@@ -59,6 +59,7 @@ public class MainMenuController : MonoBehaviour
     Slider sensitivitySlider;
     Slider brightnessSlider;
     DropdownField graphicsDropdown;
+    DropdownField framerateDropdown;
 
     string titleText;
     Coroutine flickerRoutine;
@@ -93,6 +94,7 @@ public class MainMenuController : MonoBehaviour
         sensitivitySlider = root.Q<Slider>("sensitivity-slider");
         brightnessSlider = root.Q<Slider>("brightness-slider");
         graphicsDropdown = root.Q<DropdownField>("graphics-dropdown");
+        framerateDropdown = root.Q<DropdownField>("framerate-dropdown");
 
         if (titleLabel != null) titleText = titleLabel.text;
     }
@@ -189,6 +191,7 @@ public class MainMenuController : MonoBehaviour
         WireSensitivity();
         WireBrightness();
         WireGraphics();
+        WireFrameRate();
     }
 
     void WireMasterVolume()
@@ -309,6 +312,30 @@ public class MainMenuController : MonoBehaviour
         {
             int index = System.Array.IndexOf(names, evt.newValue);
             if (index >= 0) GameSettings.SetQualityLevel(index);
+        });
+    }
+
+    void WireFrameRate()
+    {
+        if (framerateDropdown == null) return;
+
+        List<string> options = new List<string> { "30 FPS (Battery Saver)", "60 FPS (Default)", "Max / Uncapped" };
+        int[] fpsValues = new int[] { 30, 60, -1 };
+
+        framerateDropdown.choices = options;
+
+        int currentFps = GameSettings.TargetFrameRate;
+        int selectedIndex = 1; // default to 60
+        if (currentFps == 30) selectedIndex = 0;
+        else if (currentFps <= 0 || currentFps > 60) selectedIndex = 2;
+
+        framerateDropdown.SetValueWithoutNotify(options[selectedIndex]);
+
+        framerateDropdown.RegisterValueChangedCallback(evt =>
+        {
+            int idx = options.IndexOf(evt.newValue);
+            if (idx >= 0 && idx < fpsValues.Length)
+                GameSettings.SetTargetFrameRate(fpsValues[idx]);
         });
     }
 

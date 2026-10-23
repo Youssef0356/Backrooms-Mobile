@@ -54,7 +54,7 @@ public static class MenuBacteriaAnimationFix
     /// <summary>Deletes the legacy Animation that sits on the environment model.</summary>
     static int RemoveStrayAnimation()
     {
-        Animation[] strays = Object.FindObjectsByType<Animation>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+        Animation[] strays = Object.FindObjectsByType<Animation>(FindObjectsInactive.Include)
             .Where(animation => animation != null && animation.gameObject.name.StartsWith(EnvironmentObjectPrefix))
             .ToArray();
 
@@ -67,7 +67,7 @@ public static class MenuBacteriaAnimationFix
     /// <summary>Reuses the Bacteria's Animator when it has one, otherwise adds it.</summary>
     static string SetupBacteriaAnimator()
     {
-        Transform bacteria = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+        Transform bacteria = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include)
             .FirstOrDefault(transform => transform.name == BacteriaRootName && transform.parent == null);
 
         if (bacteria == null)

@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
+using Object = UnityEngine.Object;
+using Cursor = UnityEngine.Cursor;
 
 /// <summary>
 /// In-game pause menu for the main level (mobile friendly).
@@ -72,6 +74,9 @@ public class PauseMenuController : MonoBehaviour
 
     // ------------------------------------------------------------- state
 
+    /// Singleton instance for scene access.
+    public static PauseMenuController Instance { get; private set; }
+
     /// True while any pause menu on this loader context is open.
     public static bool IsPaused { get; private set; }
 
@@ -87,9 +92,9 @@ public class PauseMenuController : MonoBehaviour
     VisualElement pauseButton;
     Button resumeButton;
 
-    // Safe area tracking for the corner pause button (notch / camera cut-out).
+    // Safe area tracking for corner HUD buttons (notch / camera cut-out / rounded corners).
     // Expressed in panel units, same space the stylesheet uses.
-    const float PauseButtonMargin = 28f;
+    const float HudButtonMargin = 32f;
     Rect appliedSafeArea;
     int appliedScreenWidth;
     int appliedScreenHeight;
@@ -104,17 +109,39 @@ public class PauseMenuController : MonoBehaviour
 
     void Awake()
     {
+        Instance = this;
         BuildUI();
     }
 
     void OnEnable()
     {
+        GameOverController.OnPlayerDefeated += OnGameOverDefeated;
+        VictoryController.OnPlayerEscaped += OnGameOverDefeated;
         // If the scene starts while a stale static flag is set, clear it.
         if (!IsPaused) ShowMenu(false);
     }
 
+    void OnDisable()
+    {
+        GameOverController.OnPlayerDefeated -= OnGameOverDefeated;
+        VictoryController.OnPlayerEscaped -= OnGameOverDefeated;
+    }
+
+    void OnGameOverDefeated()
+    {
+        if (IsPaused)
+        {
+            IsPaused = false;
+            Time.timeScale = 1f;
+        }
+        ShowMenu(false);
+        SetPauseButtonVisible(false);
+    }
+
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
+
         // Never carry a paused clock or a locked cursor out of this scene.
         if (IsPaused)
         {
@@ -122,11 +149,12 @@ public class PauseMenuController : MonoBehaviour
             IsPaused = false;
             RestoreCursor();
         }
-        if (panelSettings != null) Destroy(panelSettings);
     }
 
     void Update()
     {
+        if (GameOverController.IsGameOver || VictoryController.IsGameWon) return;
+
         Keyboard keyboard = Keyboard.current;
         if (pauseOnEscape && keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             TogglePause();
@@ -146,6 +174,7 @@ public class PauseMenuController : MonoBehaviour
     /// Toggles between paused and playing.
     public void TogglePause()
     {
+        if (GameOverController.IsGameOver || VictoryController.IsGameWon) return;
         if (IsPaused) Resume();
         else Pause();
     }
@@ -153,7 +182,7 @@ public class PauseMenuController : MonoBehaviour
     /// Freezes the game and opens the menu.
     public void Pause()
     {
-        if (IsPaused) return;
+        if (IsPaused || GameOverController.IsGameOver) return;
 
         IsPaused = true;
         previousTimeScale = Time.timeScale;
@@ -205,15 +234,21 @@ public class PauseMenuController : MonoBehaviour
 
     // ------------------------------------------------------------- UI state
 
+    /// Allows external controllers (e.g. GameOverController) to explicitly hide or show corner HUD buttons.
+    public void SetPauseButtonVisible(bool visible)
+    {
+        showPauseButton = visible;
+        if (pauseButton != null)
+            pauseButton.style.display = (visible && !IsPaused) ? DisplayStyle.Flex : DisplayStyle.None;
+    }
+
     void ShowMenu(bool show)
     {
         if (overlay != null)
             overlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
 
         if (pauseButton != null)
-            pauseButton.style.display = (show || !showPauseButton)
-                ? DisplayStyle.None
-                : DisplayStyle.Flex;
+            pauseButton.style.display = (show || !showPauseButton) ? DisplayStyle.None : DisplayStyle.Flex;
 
         if (show) resumeButton?.Focus();
     }
@@ -238,7 +273,7 @@ public class PauseMenuController : MonoBehaviour
 
     // ------------------------------------------------------------- safe area
 
-    /// Keeps the corner pause button inside the device safe area (notch, camera
+    /// Keeps the corner HUD buttons inside the device safe area (notch, camera
     /// cut-out, rounded corners). Screen.safeArea is in screen pixels while the
     /// panel lays out in scaled panel units, so the insets are converted with the
     /// panel scale factor. Re-applied when the inset changes - rotating the phone
@@ -270,11 +305,14 @@ public class PauseMenuController : MonoBehaviour
         float toPanelY = panelHeight / Mathf.Max(1f, Screen.height);
 
         // Screen.safeArea is bottom-left based, UI Toolkit positions from top-left.
-        float insetRight = (Screen.width - safeArea.xMax) * toPanelX;
-        float insetTop = (Screen.height - safeArea.yMax) * toPanelY;
+        float insetRight = Mathf.Max(0f, (Screen.width - safeArea.xMax) * toPanelX);
+        float insetTop = Mathf.Max(0f, (Screen.height - safeArea.yMax) * toPanelY);
 
-        pauseButton.style.right = PauseButtonMargin + insetRight;
-        pauseButton.style.top = PauseButtonMargin + insetTop;
+        float rightPos = HudButtonMargin + insetRight;
+        float topPos = HudButtonMargin + insetTop;
+
+        pauseButton.style.right = rightPos;
+        pauseButton.style.top = topPos;
     }
 
     // ------------------------------------------------------------- UI build
@@ -284,14 +322,18 @@ public class PauseMenuController : MonoBehaviour
     {
         font = uiFont != null ? uiFont : LoadFont();
 
-        panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-        panelSettings.name = "Pause Menu Panel Settings";
-        panelSettings.renderMode = PanelRenderMode.ScreenSpaceOverlay;
-        panelSettings.sortingOrder = 100;
-        panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-        panelSettings.referenceResolution = new Vector2Int(1920, 1080);
-        panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
-        panelSettings.match = 0.5f;
+        panelSettings = Resources.Load<PanelSettings>("MenuPanelSettings");
+        if (panelSettings == null)
+        {
+            panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+            panelSettings.name = "Pause Menu Panel Settings";
+            panelSettings.renderMode = PanelRenderMode.ScreenSpaceOverlay;
+            panelSettings.sortingOrder = 100;
+            panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+            panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            panelSettings.match = 0.5f;
+        }
 
         document = gameObject.AddComponent<UIDocument>();
         document.panelSettings = panelSettings;
@@ -380,7 +422,7 @@ public class PauseMenuController : MonoBehaviour
         GameSettings.SetMusicVolume(value);
 
         if (ambience == null)
-            ambience = FindFirstObjectByType<BackroomsAmbience>(FindObjectsInactive.Include);
+            ambience = FindAnyObjectByType<BackroomsAmbience>(FindObjectsInactive.Include);
         if (ambience != null)
             ambience.SetVolume(value);
     }

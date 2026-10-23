@@ -44,7 +44,7 @@ public static class PirateClarkSetup
         AnimatorController controller = BuildController();
         if (controller == null) return;
 
-        VillainAI villain = Object.FindObjectsByType<VillainAI>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+        VillainAI villain = Object.FindObjectsByType<VillainAI>(FindObjectsInactive.Include)
             .FirstOrDefault(v => v != null && v.gameObject.name.ToLowerInvariant().Contains(VillainNameFragment));
 
         if (villain == null)
@@ -190,7 +190,7 @@ public static class PirateClarkSetup
 
     static string PointGeneratorAt(GameObject villain)
     {
-        BackroomsRoomGenerator generator = Object.FindFirstObjectByType<BackroomsRoomGenerator>();
+        BackroomsRoomGenerator generator = Object.FindAnyObjectByType<BackroomsRoomGenerator>();
         if (generator == null)
             return "No BackroomsRoomGenerator in the scene, so 'villain' was not reassigned.";
 

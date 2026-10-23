@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -77,6 +77,13 @@ namespace StarterAssets
 		// Backrooms: look sensitivity chosen in the menu (PlayerPrefs key written by GameSettings)
 		private float _sensitivity = 1f;
 
+		public float CinemachineTargetPitch => _cinemachineTargetPitch;
+		public float RotationVelocity => _rotationVelocity;
+		public StarterAssetsInputs Input => _input;
+		public CharacterController Controller => _controller;
+		public float CurrentSpeed => _speed;
+		public float VerticalVelocity => _verticalVelocity;
+
 		private bool IsCurrentDeviceMouse
 		{
 			get
@@ -140,7 +147,8 @@ namespace StarterAssets
 			if (_input.look.sqrMagnitude >= _threshold)
 			{
 				//Don't multiply mouse input by Time.deltaTime
-				float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
+				bool isDirectDelta = IsCurrentDeviceMouse || TouchscreenInput.IsTouchLookActive;
+				float deltaTimeMultiplier = isDirectDelta ? 1.0f : Time.deltaTime;
 				
 				_cinemachineTargetPitch += _input.look.y * RotationSpeed * deltaTimeMultiplier * _sensitivity;
 				_rotationVelocity = _input.look.x * RotationSpeed * deltaTimeMultiplier * _sensitivity;
@@ -153,6 +161,10 @@ namespace StarterAssets
 
 				// rotate the player left and right
 				transform.Rotate(Vector3.up * _rotationVelocity);
+			}
+			else
+			{
+				_rotationVelocity = 0.0f;
 			}
 		}
 

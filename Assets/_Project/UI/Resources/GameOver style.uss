@@ -1,0 +1,211 @@
+/* =============================================================================
+   BACKROOMS MOBILE - Game Over (Lose) Screen Style
+   -----------------------------------------------------------------------------
+   Liminal / analog horror CRT terminal aesthetic for death / entity catch.
+   Dark red + sickly yellow warning tones, scanlines, vignette, and monospaced type.
+   Lives in Resources so GameOverController loads it via Resources.Load<StyleSheet>.
+   ========================================================================== */
+
+.gameover-root {
+    /* --- palette --- */
+    --danger: rgb(225, 45, 40);               /* warning red */
+    --danger-bright: rgb(255, 75, 70);
+    --danger-dim: rgb(135, 28, 25);
+    --danger-line: rgba(225, 45, 40, 0.35);
+    --accent: rgb(223, 216, 118);             /* fluorescent yellow */
+    --accent-dim: rgb(136, 132, 72);
+    --panel-bg: rgba(12, 5, 5, 0.90);
+    --card-bg: rgba(18, 7, 7, 0.94);
+    --text: rgb(235, 230, 210);
+    --text-dim: rgba(235, 230, 210, 0.60);
+    --red-glow: rgba(225, 45, 40, 0.22);
+
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    flex-grow: 1;
+    color: var(--text);
+}
+
+.gameover-root Label,
+.gameover-root Button {
+    text-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* ============================== full-screen backdrop ===================== */
+
+.gameover-backdrop {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(10, 3, 3, 0.88);
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.35s;
+    transition-timing-function: ease-out;
+}
+
+.gameover-backdrop.is-visible {
+    opacity: 1;
+}
+
+/* CRT Scanlines and Vignette layers */
+.gameover-vignette {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("../../Art/UI/vignette.png");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.gameover-scanlines {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("../../Art/UI/scanlines.png");
+    -unity-background-scale-mode: repeat;
+    opacity: 0.65;
+}
+
+/* ============================== top status hud ============================ */
+
+.gameover-rec-badge {
+    position: absolute;
+    top: 24px;
+    left: 32px;
+    font-size: 14px;
+    letter-spacing: 4px;
+    -unity-font-style: bold;
+    color: var(--danger-bright);
+}
+
+.gameover-channel-badge {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: var(--danger-dim);
+}
+
+/* ============================== central modal card ======================== */
+
+.gameover-card {
+    width: 600px;
+    max-width: 90%;
+    padding: 34px 40px;
+    background-color: var(--card-bg);
+    border-width: 1px;
+    border-color: var(--danger-line);
+    flex-direction: column;
+}
+
+.gameover-heading {
+    font-size: 34px;
+    letter-spacing: 12px;
+    -unity-font-style: bold;
+    color: var(--danger-bright);
+    -unity-text-align: middle-center;
+}
+
+.gameover-subheading {
+    margin-top: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    -unity-text-align: middle-center;
+}
+
+.gameover-divider {
+    height: 1px;
+    background-color: var(--danger-line);
+    margin-top: 10px;
+    margin-bottom: 18px;
+}
+
+/* ============================== stats block =============================== */
+
+.gameover-stats-box {
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background-color: rgba(225, 45, 40, 0.05);
+    border-left-width: 2px;
+    border-left-color: var(--danger);
+    flex-direction: column;
+}
+
+.gameover-stat-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.gameover-stat-label {
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+}
+
+.gameover-stat-value {
+    font-size: 14px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    color: var(--accent);
+}
+
+.gameover-stat-value--danger {
+    color: var(--danger-bright);
+}
+
+/* ============================== action buttons ============================ */
+
+.gameover-button {
+    margin-top: 12px;
+    height: 52px;
+    font-size: 19px;
+    letter-spacing: 6px;
+    -unity-font-style: bold;
+    color: var(--text);
+    background-color: rgba(225, 45, 40, 0.08);
+    background-image: none;
+    border-width: 0;
+    border-left-width: 3px;
+    border-left-color: var(--danger-dim);
+    -unity-text-align: middle-left;
+    padding-left: 20px;
+    transition-property: background-color, color, border-left-color;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.gameover-button:hover,
+.gameover-button:focus {
+    background-color: rgba(225, 45, 40, 0.25);
+    border-left-color: var(--danger-bright);
+    color: var(--danger-bright);
+}
+
+.gameover-button--secondary {
+    color: var(--text-dim);
+    border-left-color: rgba(223, 216, 118, 0.25);
+    background-color: rgba(223, 216, 118, 0.04);
+}
+
+.gameover-button--secondary:hover,
+.gameover-button--secondary:focus {
+    background-color: rgba(223, 216, 118, 0.15);
+    border-left-color: var(--accent);
+    color: var(--accent);
+}

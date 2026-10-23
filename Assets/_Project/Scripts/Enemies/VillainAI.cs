@@ -8,25 +8,70 @@ public class VillainAI : MonoBehaviour
     public Transform player;                 // leave empty to auto-find the object tagged "Player"
 
     [Header("Speeds")]
-    public float wanderSpeed = 1.5f;
-    public float chaseSpeed = 4f;
+    public float wanderSpeed = 1.35f;
+    public float investigateSpeed = 2.4f;    // brisk stalking pace when hunting or hearing noise
+    public float chaseSpeed = 3.8f;
 
     [Header("Wandering")]
     public float wanderRadius = 15f;         // how far he picks random points
     public float waitAtPoint = 2f;           // pause at each point (seconds)
 
-    [Header("Vision")]
+    [Header("Vision & Flashlight")]
     public float viewDistance = 12f;
+    [Tooltip("Detection range when the player's flashlight is turned on.")]
+    public float viewDistanceFlashlight = 24f;
     [Range(10, 180)] public float viewAngle = 100f;
     public float eyeHeight = 1.5f;
-    public float loseSightTime = 4f;         // keeps chasing this long after losing you
+    public float loseSightTime = 2.0f;       // seconds after losing sight before switching to hunting the last known spot
+
+    [Header("Hearing System")]
+    [Tooltip("Whether the villain can hear player footsteps and noises.")]
+    public bool canHear = true;
+    [Range(0.5f, 2f)] public float hearingSensitivity = 1.0f;
+
+    [Header("Hunting / Last Known Position")]
+    [Tooltip("Seconds he stops and 'listens' / looks around when reaching a noise or last seen spot.")]
+    public float searchPauseDuration = 1.8f;
+    [Tooltip("Number of branching corridor spots to inspect around the last known position before giving up.")]
+    public int searchBranchesToInspect = 2;
+    public float searchBranchRadius = 8f;
+
+    [Header("Ambush & Interception (Loops)")]
+    [Tooltip("Predicts player movement ahead in corridors instead of trailing behind them.")]
+    public bool enableInterception = true;
+    public float leadDistance = 3.5f;
+    public float interceptCheckInterval = 0.35f;
 
     [Header("Catch")]
     public float catchDistance = 1.2f;
 
+    [Header("Editable Materials (Clark)")]
+    [Tooltip("Drag Clark's external materials here to easily adjust smoothness, roughness, and textures.")]
+    public Material headMaterial;
+    public Material tunicMaterial;
+    public Material pantsMaterial;
+    public Material bootMaterial;
+    public Material eyeMaterial;
+    public Material handMaterial;
+    public Material teethMaterial;
+
+    [Header("Turning & Alignment")]
+    [Tooltip("Whether to manually control turning so the villain never slides or strafes sideways.")]
+    public bool customTurning = true;
+    [Tooltip("How fast the villain pivots to face where he is moving (deg/sec).")]
+    public float turnSpeed = 720f;
+    [Tooltip("Subtle centrifugal torso roll when cornering at speed (degrees).")]
+    public float maxBankAngle = 4.5f;
+
+    [Header("Ground Alignment")]
+    [Tooltip("Vertical offset on NavMeshAgent to ground Clark's boots firmly on the carpet without floating.")]
+    public float groundOffset = -0.06f;
+
     [Header("Animation")]
-    public float walkAnimReferenceSpeed = 1.4f;  // ground speed the walk clip was authored at (lower = faster playback)
-    public float runAnimReferenceSpeed = 3.5f;   // ground speed the run clip was authored at
+    [Tooltip("Base speed walk clip was authored at (calibrated to 0.16 model scale for step synchronization).")]
+    public float walkAnimReferenceSpeed = 0.70f;
+    [Tooltip("Base speed run clip was authored at (calibrated to 0.16 model scale for step synchronization).")]
+    public float runAnimReferenceSpeed = 1.65f;
 
     [Header("Attack (optional)")]
     [Tooltip("Starts swinging when the player is closer than this while chasing.")]
@@ -42,35 +87,106 @@ public class VillainAI : MonoBehaviour
     public float teleportCooldown = 10f;        // min seconds between teleports
     [Range(1, 30)] public int teleportAttempts = 12; // random spots to try per teleport
     public float teleportSampleRadius = 3f;     // how far a spot may snap onto the NavMesh
-    [Tooltip("Only land where the player cannot see him. If no such spot exists the teleport is postponed, so he never pops into view.")]
     public bool avoidVisibleSpots = true;
-    [Tooltip("Half-angle (degrees) of the cone the player is considered to be looking at. Spots outside it count as unseen.")]
     public float playerSightHalfAngle = 60f;
 
-    enum State { Wander, Chase }
-    State state = State.Wander;
+    public enum State { Wander, Investigate, Chase }
+    [Header("Debug Info")]
+    public State currentState = State.Wander;
+    public State CurrentState => currentState;
 
     NavMeshAgent agent;
     Animator anim;
+    Flashlight cachedFlashlight;
+
     float waitTimer;
     float lostTimer;
     float teleportTimer;
     float attackTimer;
+    float interceptTimer;
+
+    Vector3 lastSeenPlayerPos;
+    Vector3 investigateTarget;
+    Vector3 lastPlayerPos;
+    bool isPausedSearching;
+    float searchPauseTimer;
+    int remainingBranches;
+    Vector3 investigateLookForward;
+
+    Transform modelRoot;
+    Transform headBone;
+    float currentBankAngle;
+    float previousYaw;
+
     bool hasTeleported;
     bool hasCaught;
 
-    // Animator parameters actually present in the controller. Rigs differ
-    // (the old Bacteria uses IsChasing only, Clark uses Speed + attack triggers),
-    // so everything is optional and only driven when it exists.
     bool hasSpeed, hasChasing, hasAttack1, hasAttack2;
     int speedHash, chasingHash, attack1Hash, attack2Hash;
+
+    void Awake()
+    {
+        ApplyEditableMaterials();
+    }
+
+    [ContextMenu("Apply Editable Materials")]
+    public void ApplyEditableMaterials()
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        foreach (var rend in renderers)
+        {
+            Material[] mats = rend.sharedMaterials;
+            bool modified = false;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] == null) continue;
+                string mName = mats[i].name.Replace(" (Instance)", "").Trim();
+
+                Material replacement = null;
+                if (headMaterial != null && mName.Equals("head", System.StringComparison.OrdinalIgnoreCase))
+                    replacement = headMaterial;
+                else if (tunicMaterial != null && mName.Equals("tunic", System.StringComparison.OrdinalIgnoreCase))
+                    replacement = tunicMaterial;
+                else if (pantsMaterial != null && mName.Equals("pants", System.StringComparison.OrdinalIgnoreCase))
+                    replacement = pantsMaterial;
+                else if (bootMaterial != null && mName.Equals("boot", System.StringComparison.OrdinalIgnoreCase))
+                    replacement = bootMaterial;
+                else if (eyeMaterial != null && (mName.Equals("EyeB", System.StringComparison.OrdinalIgnoreCase) || mName.Contains("eye", System.StringComparison.OrdinalIgnoreCase)))
+                    replacement = eyeMaterial;
+                else if (handMaterial != null && mName.Equals("hand", System.StringComparison.OrdinalIgnoreCase))
+                    replacement = handMaterial;
+                else if (teethMaterial != null && mName.Equals("teeth", System.StringComparison.OrdinalIgnoreCase))
+                    replacement = teethMaterial;
+
+                if (replacement != null && mats[i] != replacement)
+                {
+                    mats[i] = replacement;
+                    modified = true;
+                }
+            }
+            if (modified)
+            {
+                rend.sharedMaterials = mats;
+            }
+        }
+    }
+
+    void OnEnable()
+    {
+        PlayerNoiseEmitter.OnNoiseEmitted += OnNoiseHeard;
+    }
+
+    void OnDisable()
+    {
+        PlayerNoiseEmitter.OnNoiseEmitted -= OnNoiseHeard;
+    }
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         anim = GetComponentInChildren<Animator>();
         CacheAnimatorParameters();
-        SetChasing(false);                      // the controller defaults IsChasing to true
+        SetChasing(false);
 
         if (player == null)
         {
@@ -79,88 +195,339 @@ public class VillainAI : MonoBehaviour
             else Debug.LogWarning("VillainAI: no object tagged 'Player' found.");
         }
 
+        if (player != null)
+        {
+            lastPlayerPos = player.position;
+            cachedFlashlight = player.GetComponentInChildren<Flashlight>();
+
+            // Ensure player has a noise emitter attached
+            if (player.GetComponent<PlayerNoiseEmitter>() == null)
+            {
+                player.gameObject.AddComponent<PlayerNoiseEmitter>();
+            }
+        }
+
+        currentState = State.Wander;
         agent.speed = wanderSpeed;
-        GoToRandomPoint();
+
+        if (customTurning && agent != null)
+        {
+            agent.updateRotation = false;
+            agent.acceleration = 12f;
+        }
+
+        if (agent != null)
+        {
+            agent.baseOffset = groundOffset;
+        }
+
+        if (transform.childCount > 0)
+        {
+            modelRoot = transform.GetChild(0);
+        }
+
+        FindHeadBone();
+        previousYaw = transform.eulerAngles.y;
+
+        if (agent != null && agent.isOnNavMesh)
+        {
+            GoToRandomPoint();
+        }
+    }
+
+    public void OnNavMeshReady()
+    {
+        if (agent == null) agent = GetComponent<NavMeshAgent>();
+        if (agent != null)
+        {
+            agent.baseOffset = groundOffset;
+        }
+
+        if (agent != null && agent.isOnNavMesh)
+        {
+            currentState = State.Wander;
+            agent.speed = wanderSpeed;
+            waitTimer = 0f;
+            lostTimer = 0f;
+            teleportTimer = 0f;
+            GoToRandomPoint();
+        }
     }
 
     void Update()
     {
         if (player == null) return;
+        if (agent == null || !agent.isOnNavMesh) return;
 
         CheckReposition();
+        if (customTurning) UpdateRotationAndVelocity();
         SyncAnimationSpeed();
 
         bool canSee = CanSeePlayer();
 
-        if (state == State.Wander)
+        switch (currentState)
         {
-            if (canSee)
-            {
-                state = State.Chase;
-                SetChasing(true);
-                agent.speed = chaseSpeed;
-                lostTimer = 0f;
-                attackTimer = 0f;
-                return;
-            }
+            case State.Wander:
+                UpdateWander(canSee);
+                break;
 
-            // Reached the point? Wait, then pick a new one.
-            if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.2f)
-            {
-                waitTimer += Time.deltaTime;
-                if (waitTimer >= waitAtPoint)
-                {
-                    waitTimer = 0f;
-                    GoToRandomPoint();
-                }
-            }
+            case State.Investigate:
+                UpdateInvestigate(canSee);
+                break;
+
+            case State.Chase:
+                UpdateChase(canSee);
+                break;
         }
-        else // Chase
+    }
+
+    // ---------------- State Handlers ----------------
+
+    void UpdateWander(bool canSee)
+    {
+        if (canSee)
         {
-            agent.SetDestination(player.position);
+            StartChasing();
+            return;
+        }
 
-            if (canSee) lostTimer = 0f;
-            else lostTimer += Time.deltaTime;
-
-            if (lostTimer >= loseSightTime)
+        // Reached the wander point? Wait, then pick a new one.
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.25f)
+        {
+            waitTimer += Time.deltaTime;
+            if (waitTimer >= waitAtPoint)
             {
-                state = State.Wander;
-                SetChasing(false);
-                agent.speed = wanderSpeed;
+                waitTimer = 0f;
                 GoToRandomPoint();
-            }
-
-            if (Vector3.Distance(transform.position, player.position) <= catchDistance)
-            {
-                OnCaughtPlayer();
-            }
-            else
-            {
-                hasCaught = false;
-                UpdateAttack();
             }
         }
     }
 
+    void UpdateInvestigate(bool canSee)
+    {
+        if (canSee)
+        {
+            StartChasing();
+            return;
+        }
+
+        if (isPausedSearching)
+        {
+            searchPauseTimer += Time.deltaTime;
+
+            // Intelligent corridor scanning: look left, then right
+            float scanProgress = searchPauseTimer / searchPauseDuration;
+            float scanYaw = 0f;
+            if (scanProgress > 0.18f && scanProgress < 0.50f)
+            {
+                float p = Mathf.Sin((scanProgress - 0.18f) / 0.32f * Mathf.PI);
+                scanYaw = -38f * p;
+            }
+            else if (scanProgress >= 0.50f && scanProgress < 0.84f)
+            {
+                float p = Mathf.Sin((scanProgress - 0.50f) / 0.34f * Mathf.PI);
+                scanYaw = 38f * p;
+            }
+
+            if (investigateLookForward.sqrMagnitude > 0.01f)
+            {
+                Quaternion baseLook = Quaternion.LookRotation(investigateLookForward);
+                transform.rotation = Quaternion.Slerp(transform.rotation, baseLook * Quaternion.Euler(0f, scanYaw, 0f), Time.deltaTime * 5f);
+            }
+
+            if (searchPauseTimer >= searchPauseDuration)
+            {
+                searchPauseTimer = 0f;
+                isPausedSearching = false;
+
+                if (remainingBranches > 0)
+                {
+                    remainingBranches--;
+                    // Search another nearby branching hallway
+                    investigateTarget = GetNearbySearchSpot(investigateTarget, searchBranchRadius);
+                    agent.SetDestination(investigateTarget);
+                }
+                else
+                {
+                    // Thoroughly searched, return to wander
+                    currentState = State.Wander;
+                    agent.speed = wanderSpeed;
+                    SetChasing(false);
+                    GoToRandomPoint();
+                }
+            }
+            return;
+        }
+
+        // Moving towards investigate point
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.4f)
+        {
+            // Reached spot: pause and listen
+            isPausedSearching = true;
+            searchPauseTimer = 0f;
+            investigateLookForward = transform.forward;
+        }
+    }
+
+    void UpdateChase(bool canSee)
+    {
+        if (canSee)
+        {
+            lostTimer = 0f;
+            lastSeenPlayerPos = player.position;
+
+            // Ambush / Interception on loops
+            interceptTimer += Time.deltaTime;
+            if (enableInterception && interceptTimer >= interceptCheckInterval)
+            {
+                interceptTimer = 0f;
+                Vector3 playerVel = (player.position - lastPlayerPos) / Mathf.Max(Time.deltaTime, 0.001f);
+                lastPlayerPos = player.position;
+
+                if (playerVel.sqrMagnitude > 4f)
+                {
+                    Vector3 leadPoint = player.position + playerVel.normalized * leadDistance;
+                    if (NavMesh.SamplePosition(leadPoint, out NavMeshHit leadHit, 2.5f, NavMesh.AllAreas))
+                    {
+                        agent.SetDestination(leadHit.position);
+                    }
+                    else
+                    {
+                        agent.SetDestination(player.position);
+                    }
+                }
+                else
+                {
+                    agent.SetDestination(player.position);
+                }
+            }
+            else if (!enableInterception)
+            {
+                agent.SetDestination(player.position);
+            }
+        }
+        else
+        {
+            lostTimer += Time.deltaTime;
+            lastPlayerPos = player.position;
+
+            // Lost sight: continue rushing to where he was last seen
+            agent.SetDestination(lastSeenPlayerPos);
+
+            if (lostTimer >= loseSightTime)
+            {
+                // Switch to Hunt / Investigate mode at the last known position
+                currentState = State.Investigate;
+                agent.speed = investigateSpeed;
+                investigateTarget = lastSeenPlayerPos;
+                agent.SetDestination(investigateTarget);
+                remainingBranches = searchBranchesToInspect;
+                isPausedSearching = false;
+                SetChasing(false);
+                return;
+            }
+        }
+
+        // Check catch & attack
+        if (Vector3.Distance(transform.position, player.position) <= catchDistance)
+        {
+            OnCaughtPlayer();
+        }
+        else
+        {
+            hasCaught = false;
+            UpdateAttack();
+        }
+    }
+
+    void StartChasing()
+    {
+        currentState = State.Chase;
+        agent.speed = chaseSpeed;
+        SetChasing(true);
+        lostTimer = 0f;
+        attackTimer = 0f;
+        interceptTimer = 0f;
+        lastSeenPlayerPos = player.position;
+        lastPlayerPos = player.position;
+        agent.SetDestination(player.position);
+    }
+
+    // ---------------- Hearing System ----------------
+
+    void OnNoiseHeard(Vector3 noiseOrigin, float radius)
+    {
+        if (!canHear || player == null) return;
+        if (agent == null || !agent.isOnNavMesh) return;
+
+        float dist = Vector3.Distance(transform.position, noiseOrigin);
+        float effectiveRadius = radius * hearingSensitivity;
+
+        if (dist <= effectiveRadius)
+        {
+            // If already chasing, he's actively locked on
+            if (currentState == State.Chase)
+            {
+                lastSeenPlayerPos = noiseOrigin;
+                return;
+            }
+
+            // Alerted! Investigate sound location
+            currentState = State.Investigate;
+            agent.speed = investigateSpeed;
+            investigateTarget = noiseOrigin;
+            agent.SetDestination(investigateTarget);
+            remainingBranches = searchBranchesToInspect;
+            isPausedSearching = false;
+            SetChasing(false);
+        }
+    }
+
+    // ---------------- Vision & Flashlight ----------------
+
     bool CanSeePlayer()
     {
+        if (player == null) return false;
+
+        if (cachedFlashlight == null)
+            cachedFlashlight = player.GetComponentInChildren<Flashlight>();
+
+        bool isLightOn = cachedFlashlight != null && cachedFlashlight.IsOn;
+        float currentDistance = isLightOn ? viewDistanceFlashlight : viewDistance;
+        float currentAngle = isLightOn ? Mathf.Min(150f, viewAngle * 1.3f) : viewAngle;
+
         Vector3 eyes = transform.position + Vector3.up * eyeHeight;
         Vector3 target = player.position + Vector3.up * 1f;
         Vector3 dir = target - eyes;
 
-        if (dir.magnitude > viewDistance) return false;
-        if (Vector3.Angle(transform.forward, dir) > viewAngle * 0.5f) return false;
+        if (dir.magnitude > currentDistance) return false;
+        if (Vector3.Angle(transform.forward, dir) > currentAngle * 0.5f) return false;
 
-        // Make sure no wall is in the way
-        if (Physics.Raycast(eyes, dir.normalized, out RaycastHit hit, viewDistance, ~0, QueryTriggerInteraction.Ignore))
+        // Line-of-sight raycast
+        if (Physics.Raycast(eyes, dir.normalized, out RaycastHit hit, currentDistance, ~0, QueryTriggerInteraction.Ignore))
         {
             return hit.transform == player || hit.transform.IsChildOf(player) || player.IsChildOf(hit.transform);
         }
         return false;
     }
 
+    Vector3 GetNearbySearchSpot(Vector3 origin, float radius)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 randomPoint = origin + Random.insideUnitSphere * radius;
+            if (NavMesh.SamplePosition(randomPoint, out NavMeshHit navHit, radius, NavMesh.AllAreas))
+            {
+                return navHit.position;
+            }
+        }
+        return origin;
+    }
+
     void GoToRandomPoint()
     {
+        if (agent == null || !agent.isOnNavMesh) return;
+
         Vector3 random = transform.position + Random.insideUnitSphere * wanderRadius;
         if (NavMesh.SamplePosition(random, out NavMeshHit navHit, wanderRadius, NavMesh.AllAreas))
         {
@@ -192,30 +559,162 @@ public class VillainAI : MonoBehaviour
         if (anim != null && hasChasing) anim.SetBool(chasingHash, value);
     }
 
-    /// Keeps the playback rate in step with the agent's real ground speed so
-    /// the feet never slide (moonwalk) or stutter when the speed changes.
+    float GetBaseStateSpeed()
+    {
+        switch (currentState)
+        {
+            case State.Chase: return chaseSpeed;
+            case State.Investigate: return investigateSpeed;
+            default: return wanderSpeed;
+        }
+    }
+
+    void UpdateRotationAndVelocity()
+    {
+        if (agent == null || !agent.isOnNavMesh) return;
+
+        Vector3 moveDir = agent.desiredVelocity;
+        moveDir.y = 0f;
+
+        float baseSpeed = GetBaseStateSpeed();
+
+        if (moveDir.sqrMagnitude > 0.05f)
+        {
+            Vector3 targetDir = moveDir.normalized;
+            Quaternion targetRot = Quaternion.LookRotation(targetDir);
+
+            // Dynamic angular ease: snappy start that eases as it locks onto the path
+            float angleDelta = Quaternion.Angle(transform.rotation, targetRot);
+            float turnFactor = Mathf.Clamp(angleDelta / 25f, 0.6f, 1.35f);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * turnFactor * Time.deltaTime);
+
+            // Alignment: 1.0 when facing target direction, 0 when facing sideways or backward
+            float alignment = Mathf.Clamp01(Vector3.Dot(transform.forward, targetDir));
+
+            // Throttle agent speed: when changing direction, stop/slow down to pivot on the spot
+            // Only advance forward as the body aligns to face the path!
+            agent.speed = baseSpeed * (alignment * alignment);
+
+            // Eliminate any backward or sideways slide
+            Vector3 localVel = transform.InverseTransformDirection(agent.velocity);
+            if (localVel.z < 0f)
+            {
+                localVel.z = 0f;
+                localVel.x *= 0.2f;
+                agent.velocity = transform.TransformDirection(localVel);
+            }
+
+            // Corner Banking (Subtle physical roll tilt into sharp turns)
+            float currentYaw = transform.eulerAngles.y;
+            float yawDelta = Mathf.DeltaAngle(previousYaw, currentYaw);
+            previousYaw = currentYaw;
+
+            float targetBank = Mathf.Clamp(-yawDelta * 1.5f, -maxBankAngle, maxBankAngle);
+            currentBankAngle = Mathf.Lerp(currentBankAngle, targetBank, Time.deltaTime * 8f);
+
+            if (modelRoot != null)
+            {
+                modelRoot.localRotation = Quaternion.Euler(0f, 0f, currentBankAngle);
+            }
+        }
+        else
+        {
+            previousYaw = transform.eulerAngles.y;
+            currentBankAngle = Mathf.Lerp(currentBankAngle, 0f, Time.deltaTime * 6f);
+            if (modelRoot != null)
+            {
+                modelRoot.localRotation = Quaternion.Euler(0f, 0f, currentBankAngle);
+            }
+
+            agent.speed = baseSpeed;
+
+            if (currentState == State.Chase && player != null)
+            {
+                // When stopped or close, face the player directly
+                Vector3 toPlayer = player.position - transform.position;
+                toPlayer.y = 0f;
+                if (toPlayer.sqrMagnitude > 0.05f)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(toPlayer);
+                    transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * Time.deltaTime);
+                }
+            }
+        }
+    }
+
     void SyncAnimationSpeed()
     {
         if (anim == null) return;
 
         float groundSpeed = agent.velocity.magnitude;
 
-        // Controllers with an Idle/Walk/Run blend read the speed themselves.
+        Vector3 moveDir = agent.desiredVelocity;
+        moveDir.y = 0f;
+        bool isPivotingOnSpot = moveDir.sqrMagnitude > 0.05f && Vector3.Angle(transform.forward, moveDir) > 35f;
+
         if (hasSpeed)
         {
-            anim.speed = 1f;
-            anim.SetFloat(speedHash, groundSpeed);
+            // Smoothly damp the animator Speed parameter over 0.12s for organic footstep transitions
+            float targetDisplaySpeed = isPivotingOnSpot ? (walkAnimReferenceSpeed * 0.75f) : groundSpeed;
+            anim.SetFloat(speedHash, targetDisplaySpeed, 0.12f, Time.deltaTime);
+        }
+
+        // When standing still, play at normal rate for idle / attacks
+        if (groundSpeed < 0.08f)
+        {
+            anim.speed = isPivotingOnSpot ? 0.9f : 1f;
             return;
         }
 
-        float reference = state == State.Chase ? runAnimReferenceSpeed : walkAnimReferenceSpeed;
+        float reference = walkAnimReferenceSpeed;
+        if (currentState == State.Chase || groundSpeed > 2.2f)
+        {
+            reference = runAnimReferenceSpeed;
+        }
+
         if (reference < 0.1f) reference = 0.1f;
 
-        // tiny floor so transitions keep progressing while he stands still
-        anim.speed = Mathf.Clamp(groundSpeed / reference, 0.05f, 3f);
+        // Directly link playback rate to real ground speed so feet never slide
+        anim.speed = Mathf.Clamp(groundSpeed / reference, 0.4f, 3.0f);
     }
 
-    /// Swings when he is close but not yet on top of the player.
+    void LateUpdate()
+    {
+        if (headBone == null || player == null) return;
+        if (currentState == State.Wander && !CanSeePlayer()) return;
+
+        // When hunting, investigating, or chasing, head tracks the player
+        Vector3 targetPoint = player.position + Vector3.up * 1.4f;
+        Vector3 toTarget = targetPoint - headBone.position;
+
+        if (Vector3.Angle(transform.forward, toTarget) < 65f)
+        {
+            Quaternion lookRot = Quaternion.LookRotation(toTarget, Vector3.up);
+            headBone.rotation = Quaternion.Slerp(headBone.rotation, lookRot, Time.deltaTime * 6f);
+        }
+    }
+
+    void FindHeadBone()
+    {
+        headBone = FindChildRecursive(transform, "head", "neck", "spine_03", "spine.003", "spine_02");
+    }
+
+    Transform FindChildRecursive(Transform parent, params string[] names)
+    {
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            string lowerName = child.name.ToLowerInvariant();
+            foreach (string n in names)
+            {
+                if (lowerName.Contains(n)) return child;
+            }
+            Transform found = FindChildRecursive(child, names);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     void UpdateAttack()
     {
         if (anim == null || (!hasAttack1 && !hasAttack2)) return;
@@ -231,7 +730,38 @@ public class VillainAI : MonoBehaviour
         else anim.SetTrigger(attack1Hash);
     }
 
-    // ---------------- Teleport back near the player ----------------
+    // ---------------- Catch & Teleport ----------------
+
+    void OnCaughtPlayer()
+    {
+        if (hasCaught) return;
+        hasCaught = true;
+
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+
+        Camera mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            Vector3 toCam = mainCam.transform.position - transform.position;
+            toCam.y = 0f;
+            if (toCam.sqrMagnitude > 0.01f)
+            {
+                transform.rotation = Quaternion.LookRotation(toCam);
+            }
+        }
+
+        if (anim != null && hasAttack1)
+        {
+            anim.speed = 1f;
+            anim.SetTrigger(attack1Hash);
+        }
+
+        GameOverController.TriggerDefeat(transform);
+    }
 
     void CheckReposition()
     {
@@ -250,16 +780,16 @@ public class VillainAI : MonoBehaviour
 
     void TeleportNearPlayer()
     {
+        if (agent == null || !agent.isOnNavMesh) return;
+
         if (!TryFindTeleportSpot(out Vector3 chosen))
         {
-            // Every candidate would land in view: wait for the next cooldown
-            // instead of popping into the player's sight.
             teleportTimer = 0f;
             return;
         }
 
         agent.Warp(chosen);
-        state = State.Wander;
+        currentState = State.Wander;
         SetChasing(false);
         agent.speed = wanderSpeed;
         waitTimer = 0f;
@@ -267,19 +797,11 @@ public class VillainAI : MonoBehaviour
         teleportTimer = 0f;
         hasTeleported = true;
         GoToRandomPoint();
-
-#if UNITY_EDITOR
-        Debug.Log("VillainAI: repositioned near the player (unseen).");
-#endif
     }
 
-    /// Finds a NavMesh spot at teleportRange from the player that he cannot
-    /// currently see. Returns false when every candidate would be in view, so the
-    /// caller can postpone instead of teleporting in plain sight.
     bool TryFindTeleportSpot(out Vector3 spot)
     {
         spot = Vector3.zero;
-
         Vector3 playerPos = player.position;
         float minDist = teleportRange.x * 0.6f;
 
@@ -293,8 +815,6 @@ public class VillainAI : MonoBehaviour
                 continue;
 
             Vector3 pos = navHit.position;
-
-            // Never land on top of the player (NavMesh snapping may have moved the spot closer)
             float flatDist = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(playerPos.x, playerPos.z));
             if (flatDist < minDist) continue;
 
@@ -307,38 +827,35 @@ public class VillainAI : MonoBehaviour
         return false;
     }
 
-    /// Visible = inside the cone the player is facing AND with a clear line of
-    /// sight. Spots behind him or around a corner are safe, which is exactly what
-    /// makes the teleport invisible.
     bool IsSpotVisibleToPlayer(Vector3 spot)
     {
         Vector3 eyes = player.position + Vector3.up * eyeHeight;
-        Vector3 target = spot + Vector3.up * 1.1f;          // body height, not the floor
+        Vector3 target = spot + Vector3.up * 1.1f;
         Vector3 dir = target - eyes;
 
-        if (Vector3.Angle(player.forward, dir) > playerSightHalfAngle) return false;  // behind him
+        if (Vector3.Angle(player.forward, dir) > playerSightHalfAngle) return false;
 
         if (Physics.Raycast(eyes, dir.normalized, out _, dir.magnitude, ~0, QueryTriggerInteraction.Ignore))
-            return false;                                    // a wall hides him
+            return false;
 
-        return true;                                         // in the cone, nothing in the way
+        return true;
     }
 
-    void OnCaughtPlayer()
-    {
-        if (hasCaught) return;
-        hasCaught = true;
-
-        if (anim != null && hasAttack1) anim.SetTrigger(attack1Hash);
-
-        // Put your game over / jumpscare / restart logic here.
-        Debug.Log("Player caught!");
-    }
-
-    // Shows the vision range in the Scene view when selected
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, viewDistance);
+
+        if (currentState == State.Investigate)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireSphere(investigateTarget, 1.5f);
+            Gizmos.DrawLine(transform.position, investigateTarget);
+        }
+        else if (currentState == State.Chase)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(lastSeenPlayerPos, 1.2f);
+        }
     }
 }

@@ -82,6 +82,8 @@
 
                 <ui:DropdownField name="graphics-dropdown" class="setting-dropdown" label="GRAPHICS" />
 
+                <ui:DropdownField name="framerate-dropdown" class="setting-dropdown" label="TARGET FPS" />
+
                 <ui:Button name="settings-close-button" class="overlay-button" text="BACK" />
             </ui:VisualElement>
         </ui:VisualElement>

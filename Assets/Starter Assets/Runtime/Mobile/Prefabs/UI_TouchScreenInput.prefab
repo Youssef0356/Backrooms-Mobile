@@ -65,7 +65,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   MoveMagnitudeMultiplier: 1
-  LookMagnitudeMultiplier: 80
+  LookMagnitudeMultiplier: 1
   InvertLookY: 1
   MoveEvent:
     m_PersistentCalls:

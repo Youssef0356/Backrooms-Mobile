@@ -6,6 +6,15 @@
     background-image: url("./Images/UI_Circle_Bevel_Base.png#UI_Circle_Bevel_Base");
 }
 
+/* Touch Look Zone: full height, covers the right 60% of the screen */
+#TouchLookZone {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 60%;
+    height: 100%;
+}
+
 #JoystickMove {
     position: absolute;
     width: 330px;
@@ -13,15 +22,6 @@
     
     left: 25px;
     bottom: 15px;
-}
-
-#JoystickLook {
-    position: absolute;
-    width: 240px;
-    height: 240px;
-
-    right: 55px;
-    bottom: 245px;
 }
 
 #JoystickBackground {
@@ -43,7 +43,6 @@
 }
 
 .button-icon {
-    
     position: absolute;
     
     top: 50%;
@@ -51,41 +50,38 @@
     
     translate: -50%;
     
-    width: 70px;
-    height: 70px;
+    width: 65px;
+    height: 65px;
 }
 
 #JoystickMove #JoystickIcon {
     background-image: url("./Images/UI_Icon_Move.png#UI_Icon_Move");
 }
 
-#JoystickLook #JoystickIcon {
-    background-image: url("./Images/UI_Icon_Look.png#UI_Icon_Look");
-}
-
-#ButtonJump {
+/* Flashlight button: stacked directly above Sprint button */
+#ButtonFlashlight {
     width: 110px;
     height: 110px;
-    
+
     position: absolute;
-    
-    right : 45px;
-    bottom : 125px;
+
+    right: 40px;
+    bottom: 160px;
 }
 
+#ButtonFlashlight #ButtonImage {
+    background-image: url("./Images/UI_Icon_Flashlight.png#UI_Icon_Flashlight");
+}
+
+/* Sprint button: lower right corner */
 #ButtonSprint {
     width: 110px;
     height: 110px;
 
     position: absolute;
 
-    right : 130px;
-    bottom : 25px;
-}
-
-
-#ButtonJump #ButtonImage {
-    background-image: url("./Images/UI_Icon_Jump.png#UI_Icon_Jump");
+    right: 40px;
+    bottom: 30px;
 }
 
 #ButtonSprint #ButtonImage {

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Rendering;
 using Unity.AI.Navigation;
 
 /// Generates a backrooms level made of rooms (with pillar grids) joined by corridors.
@@ -42,9 +43,9 @@ public class BackroomsRoomGenerator : MonoBehaviour
     [Tooltip("Spawns a real point light under every ceiling panel, so the level is lit by its fixtures instead of flat ambient.")]
     public bool panelLights = true;
     [Tooltip("Upper bound on point lights in the whole level. Panels past this keep their glow but cast no light.")]
-    public int maxPanelLights = 64;
-    public float panelLightIntensity = 3f;
-    public float panelLightRange = 9f;
+    public int maxPanelLights = 24;
+    public float panelLightIntensity = 1.9f;
+    public float panelLightRange = 7.0f;
     public Color panelLightColor = new Color(1f, 0.96f, 0.84f);
     [Tooltip("Chance a panel light is a dying fluorescent that randomly stutters.")]
     [Range(0f, 1f)] public float panelFlickerChance = 0.08f;
@@ -103,6 +104,13 @@ public class BackroomsRoomGenerator : MonoBehaviour
     {
         if (seed != 0) Random.InitState(seed);
 
+        if (villain != null)
+        {
+            NavMeshAgent villainAgent = villain.GetComponent<NavMeshAgent>();
+            if (villainAgent != null) villainAgent.enabled = false;
+            villain.SetActive(false);
+        }
+
         if (root != null) Destroy(root.gameObject);
         root = new GameObject("GeneratedMap").transform;
         root.SetParent(surface != null ? surface.transform : transform, false);
@@ -118,9 +126,10 @@ public class BackroomsRoomGenerator : MonoBehaviour
         BuildWalls();
         BuildPillars();
         BuildLights();
-        BuildDecorations();
 
-        StaticBatchingUtility.Combine(root.gameObject);
+        CombineGeneratedMeshes();
+
+        BuildDecorations();
 
         if (surface != null)
         {
@@ -132,6 +141,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
         PlaceActors();
         EnsureAmbience();
         EnsureAtmosphere();
+        EnsureBlackoutEvents();
+        EnsureParticles();
+        EnsureVHSGlitch();
+        EnsureGameOverSystem();
+        EnsureVictorySystem();
+        EnsurePlayerMotion();
     }
 
     // ---------------- Layout ----------------
@@ -578,13 +593,36 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
     void SpawnDecoration(GameObject prefab, Vector2Int cell, int side, bool forceWallItem, int[] dx, int[] dz)
     {
-        GameObject g = Instantiate(prefab, root, false);
+        // Clean wrapper so the prop pivot is always centered regardless of original 3D model pivot offsets
+        GameObject wrapper = new GameObject(prefab.name);
+        wrapper.transform.SetParent(root, false);
+
+        GameObject g = Instantiate(prefab, wrapper.transform, false);
         g.transform.localPosition = Vector3.zero;
         g.transform.localRotation = Quaternion.identity;
-        g.transform.localScale = prefab.transform.localScale *
-                                 Random.Range(decorationScaleRange.x, decorationScaleRange.y);
 
-        bool wallItem = forceWallItem || IsFlatWallProp(g);
+        // Shift inner object so that the wrapper pivot is exactly at the bottom-center of the visual mesh
+        Bounds b = GetBounds(g);
+        Vector3 bottomCenter = new Vector3(b.center.x, b.min.y, b.center.z);
+        g.transform.position -= bottomCenter;
+
+        // Apply prefab local scale modulated by random variance
+        wrapper.transform.localScale = prefab.transform.localScale *
+                                       Random.Range(decorationScaleRange.x, decorationScaleRange.y);
+
+        // Sanity check: keep props at believable Backrooms scale (fit within 2.5m corridors, not microscopic)
+        Bounds finalB = GetBounds(wrapper);
+        float maxDim = Mathf.Max(finalB.size.x, Mathf.Max(finalB.size.y, finalB.size.z));
+        if (maxDim > 2.2f && !forceWallItem && !IsFlatWallProp(wrapper))
+        {
+            wrapper.transform.localScale *= (1.8f / maxDim);
+        }
+        else if (maxDim < 0.25f && maxDim > 0.001f)
+        {
+            wrapper.transform.localScale *= (0.6f / maxDim);
+        }
+
+        bool wallItem = forceWallItem || IsFlatWallProp(wrapper);
         bool weird = Random.value < weirdChance;
 
         Vector3 dir = new Vector3(dx[side], 0f, dz[side]);   // points out at the wall
@@ -592,23 +630,23 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
         if (wallItem)
         {
-            if (weird) MountWeird(g, center, dir);
-            else MountFlat(g, center, dir);
+            if (weird) MountWeird(wrapper, center, dir);
+            else MountFlat(wrapper, center, dir);
         }
         else if (!weird)
         {
-            PlaceOnFloor(g, center, dir, 0f);
+            PlaceOnFloor(wrapper, center, dir, 0f);
         }
         else
         {
             int mode = Random.Range(0, 4);
-            if (mode == 0) MountWeird(g, center, dir);        // chair glued to the wall
-            else if (mode == 1) HangFromCeiling(g, center, dir);
-            else if (mode == 2) FloatInAir(g, center, dir);
-            else PlaceOnFloor(g, center, dir, Random.Range(0.15f, 0.45f)); // half sunk into the carpet
+            if (mode == 0) MountWeird(wrapper, center, dir);        // chair glued to the wall
+            else if (mode == 1) HangFromCeiling(wrapper, center, dir);
+            else if (mode == 2) FloatInAir(wrapper, center, dir);
+            else PlaceOnFloor(wrapper, center, dir, Random.Range(0.15f, 0.45f)); // half sunk into the carpet
         }
 
-        FinishDecoration(g);
+        FinishDecoration(wrapper);
     }
 
     /// A prop much thinner than it is wide reads as a poster / picture / sign.
@@ -713,6 +751,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
     void FinishDecoration(GameObject g)
     {
+        EnsurePropColliders(g);
+
         foreach (Transform t in g.GetComponentsInChildren<Transform>())
         {
             t.gameObject.isStatic = true;
@@ -727,7 +767,125 @@ public class BackroomsRoomGenerator : MonoBehaviour
         }
     }
 
+    /// Automatically generates solid box colliders for all renderers in a prop if missing,
+    /// preventing the player from clipping / walking through furniture.
+    void EnsurePropColliders(GameObject g)
+    {
+        Collider[] existing = g.GetComponentsInChildren<Collider>();
+        if (existing != null && existing.Length > 0) return;
+
+        Renderer[] renderers = g.GetComponentsInChildren<Renderer>();
+        if (renderers == null || renderers.Length == 0) return;
+
+        foreach (Renderer r in renderers)
+        {
+            if (r.GetComponent<Collider>() != null) continue;
+
+            Vector3 ls = r.transform.lossyScale;
+            bool hasNegativeScale = ls.x < 0f || ls.y < 0f || ls.z < 0f;
+
+            MeshFilter mf = r.GetComponent<MeshFilter>();
+            SkinnedMeshRenderer smr = r as SkinnedMeshRenderer;
+
+            if (hasNegativeScale)
+            {
+                Mesh sharedMesh = mf != null ? mf.sharedMesh : (smr != null ? smr.sharedMesh : null);
+                if (sharedMesh != null)
+                {
+                    MeshCollider mc = r.gameObject.AddComponent<MeshCollider>();
+                    mc.convex = true;
+                    mc.sharedMesh = sharedMesh;
+                    continue;
+                }
+            }
+
+            if (mf != null && mf.sharedMesh != null)
+            {
+                BoxCollider bc = r.gameObject.AddComponent<BoxCollider>();
+                bc.center = mf.sharedMesh.bounds.center;
+                bc.size = mf.sharedMesh.bounds.size;
+            }
+            else
+            {
+                BoxCollider bc = r.gameObject.AddComponent<BoxCollider>();
+                bc.center = r.localBounds.center;
+                bc.size = r.localBounds.size;
+            }
+        }
+    }
+
     // ---------------- Helpers ----------------
+
+    void CombineGeneratedMeshes()
+    {
+        if (root == null) return;
+
+        MeshFilter[] filters = root.GetComponentsInChildren<MeshFilter>();
+        if (filters == null || filters.Length == 0) return;
+
+        Dictionary<Material, List<CombineInstance>> batches = new Dictionary<Material, List<CombineInstance>>();
+        List<GameObject> toClean = new List<GameObject>();
+
+        Matrix4x4 rootInv = root.worldToLocalMatrix;
+
+        foreach (MeshFilter mf in filters)
+        {
+            if (mf == null || mf.sharedMesh == null) continue;
+            string n = mf.gameObject.name;
+            if (n != "Floor" && n != "Ceiling" && n != "Wall" && n != "Pillar" && n != "Baseboard" && n != "LightPanel")
+                continue;
+
+            MeshRenderer mr = mf.GetComponent<MeshRenderer>();
+            if (mr == null || mr.sharedMaterial == null) continue;
+
+            Material mat = mr.sharedMaterial;
+            if (!batches.TryGetValue(mat, out List<CombineInstance> list))
+            {
+                list = new List<CombineInstance>();
+                batches[mat] = list;
+            }
+
+            CombineInstance ci = new CombineInstance();
+            ci.mesh = mf.sharedMesh;
+            ci.transform = rootInv * mf.transform.localToWorldMatrix;
+            list.Add(ci);
+
+            toClean.Add(mf.gameObject);
+        }
+
+        // Remove redundant individual renderers/filters while keeping colliders for physics & navmesh
+        foreach (GameObject go in toClean)
+        {
+            MeshRenderer mr = go.GetComponent<MeshRenderer>();
+            MeshFilter mf = go.GetComponent<MeshFilter>();
+            if (mr != null) Destroy(mr);
+            if (mf != null) Destroy(mf);
+        }
+
+        // Create one combined mesh per material batch (reduces thousands of draw calls down to ~5)
+        foreach (KeyValuePair<Material, List<CombineInstance>> pair in batches)
+        {
+            Material mat = pair.Key;
+            List<CombineInstance> instances = pair.Value;
+            if (instances.Count == 0) continue;
+
+            GameObject chunkGo = new GameObject($"Combined_{mat.name}");
+            chunkGo.transform.SetParent(root, false);
+            chunkGo.isStatic = true;
+
+            MeshFilter mf = chunkGo.AddComponent<MeshFilter>();
+            MeshRenderer mr = chunkGo.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+
+            Mesh combinedMesh = new Mesh();
+            combinedMesh.name = $"Combined_{mat.name}_Mesh";
+            combinedMesh.indexFormat = IndexFormat.UInt32;
+            combinedMesh.CombineMeshes(instances.ToArray(), true, true);
+            mf.sharedMesh = combinedMesh;
+
+            IgnoreForNavMesh(chunkGo);
+        }
+    }
 
     GameObject Box(string name, Vector3 pos, Vector3 scale, Material mat, bool ignoreNav)
     {
@@ -737,6 +895,14 @@ public class BackroomsRoomGenerator : MonoBehaviour
         g.transform.localPosition = pos;
         g.transform.localScale = scale;
         g.isStatic = true;
+
+        // Discard redundant physics colliders on non-walkable / purely visual ceilings, baseboards, and lights
+        if (name == "Ceiling" || name == "Baseboard" || name == "LightPanel")
+        {
+            Collider col = g.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+        }
+
         ApplyWorldUVs(g, pos, scale, name);
         if (mat != null) g.GetComponent<Renderer>().sharedMaterial = mat;
         if (ignoreNav) IgnoreForNavMesh(g);
@@ -864,20 +1030,105 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
         if (villain != null)
         {
-            if (NavMesh.SamplePosition(villainPos, out NavMeshHit hit, tileSize * 2f, NavMesh.AllAreas))
-                villain.transform.position = hit.position;
-            else
-                villain.transform.position = villainPos;
+            NavMeshAgent agent = villain.GetComponent<NavMeshAgent>();
+            if (agent != null) agent.enabled = false;
 
+            Vector3 targetPos = villainPos;
+            if (NavMesh.SamplePosition(villainPos, out NavMeshHit hit, tileSize * 4f, NavMesh.AllAreas))
+                targetPos = hit.position;
+
+            villain.transform.position = targetPos;
             villain.SetActive(true);
+
+            if (agent != null)
+            {
+                agent.enabled = true;
+                agent.Warp(targetPos);
+            }
+
+            VillainAI ai = villain.GetComponent<VillainAI>();
+            if (ai != null)
+            {
+                ai.OnNavMeshReady();
+            }
         }
+
+        PlaceExit(farthest, startCell);
+    }
+
+    void PlaceExit(RectInt villainRoom, Vector2Int startCell)
+    {
+        RectInt exitRoom = rooms[0];
+        float bestScore = -1f;
+
+        foreach (RectInt r in rooms)
+        {
+            if (r.Equals(villainRoom) && rooms.Count > 1) continue;
+            Vector2Int c = RoomCenter(r);
+            float distToPlayer = Vector2Int.Distance(startCell, c);
+            float distToVillain = Vector2Int.Distance(RoomCenter(villainRoom), c);
+
+            float score = distToPlayer * 1.5f + distToVillain * 0.5f;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                exitRoom = r;
+            }
+        }
+
+        Vector2Int exitCell = RoomCenter(exitRoom);
+        Vector3 exitPos = CellCenter(exitCell.x, exitCell.y);
+
+        int[] edx = { 0, 1, 0, -1 };
+        int[] edz = { 1, 0, -1, 0 };
+        float[] eyaw = { 180f, 270f, 0f, 90f };
+
+        Vector3 finalPos = exitPos;
+        Quaternion finalRot = Quaternion.identity;
+        bool foundWall = false;
+
+        for (int x = exitRoom.xMin; x < exitRoom.xMax && !foundWall; x++)
+        {
+            for (int z = exitRoom.yMin; z < exitRoom.yMax && !foundWall; z++)
+            {
+                for (int s = 0; s < 4; s++)
+                {
+                    int nx = x + edx[s];
+                    int nz = z + edz[s];
+                    if (nx < 0 || nx >= gridWidth || nz < 0 || nz >= gridHeight || !floor[nx, nz])
+                    {
+                        Vector3 cCenter = CellCenter(x, z);
+                        Vector3 wallOffset = new Vector3(edx[s], 0f, edz[s]) * (tileSize * 0.44f);
+                        finalPos = cCenter + wallOffset;
+                        finalRot = Quaternion.Euler(0f, eyaw[s], 0f);
+                        foundWall = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        GameObject exitGo = BackroomsExitZone.BuildExitPortal(finalPos, finalRot, wallMaterial, lightPanelMaterial);
+        if (root != null) exitGo.transform.SetParent(root, true);
+    }
+
+    void EnsureGameOverSystem()
+    {
+        if (FindAnyObjectByType<GameOverController>() != null) return;
+        new GameObject("GameOver Menu").AddComponent<GameOverController>();
+    }
+
+    void EnsureVictorySystem()
+    {
+        if (FindAnyObjectByType<VictoryController>() != null) return;
+        new GameObject("Victory Menu").AddComponent<VictoryController>();
     }
 
     // Creates the ambience player once, so the backrooms SFX start with the level.
     void EnsureAmbience()
     {
         if (!autoAmbience) return;
-        if (FindFirstObjectByType<BackroomsAmbience>() != null) return;
+        if (FindAnyObjectByType<BackroomsAmbience>() != null) return;
 
         new GameObject("Backrooms Ambience").AddComponent<BackroomsAmbience>();
     }
@@ -889,5 +1140,42 @@ public class BackroomsRoomGenerator : MonoBehaviour
         if (FindAnyObjectByType<BackroomsAtmosphere>() != null) return;
 
         new GameObject("Backrooms Atmosphere").AddComponent<BackroomsAtmosphere>();
+    }
+
+    // Power fluctuations / blackout horror events
+    void EnsureBlackoutEvents()
+    {
+        if (FindAnyObjectByType<BackroomsBlackoutEvent>() != null) return;
+
+        gameObject.AddComponent<BackroomsBlackoutEvent>();
+    }
+
+    void EnsureParticles()
+    {
+        if (FindAnyObjectByType<BackroomsParticles>() != null) return;
+
+        new GameObject("Backrooms Particles").AddComponent<BackroomsParticles>();
+    }
+
+    void EnsureVHSGlitch()
+    {
+        if (FindAnyObjectByType<CameraVHSGlitch>() != null) return;
+
+        new GameObject("Camera VHS Glitch").AddComponent<CameraVHSGlitch>();
+    }
+
+    void EnsurePlayerMotion()
+    {
+        Transform targetPlayer = player;
+        if (targetPlayer == null)
+        {
+            var fpc = FindAnyObjectByType<StarterAssets.FirstPersonController>();
+            if (fpc != null) targetPlayer = fpc.transform;
+        }
+
+        if (targetPlayer != null && targetPlayer.GetComponent<StarterAssets.FirstPersonMotion>() == null)
+        {
+            targetPlayer.gameObject.AddComponent<StarterAssets.FirstPersonMotion>();
+        }
     }
 }

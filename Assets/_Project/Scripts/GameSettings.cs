@@ -22,6 +22,7 @@ public static class GameSettings
     public const string SensitivityKey = "backrooms.sensitivity";
     public const string BrightnessKey = "backrooms.brightness";
     public const string QualityKey = "backrooms.quality";
+    public const string TargetFrameRateKey = "backrooms.targetFrameRate";
 
     // Defaults = current game behaviour before the player changes anything
     public const float DefaultMasterVolume = 0.8f;
@@ -29,18 +30,21 @@ public static class GameSettings
     public const float DefaultSensitivity = 1f;      // menu slider shows 100%
     public const float DefaultBrightness = 0.5f;     // menu slider shows 50% = unchanged
     public const int DefaultQuality = -1;            // -1 = keep the project default
+    public const int DefaultTargetFrameRate = 60;    // 60 FPS standard for mobile to prevent overheating
 
     static float master = DefaultMasterVolume;
     static float music = DefaultMusicVolume;
     static float sensitivity = DefaultSensitivity;
     static float brightness = DefaultBrightness;
     static int quality = DefaultQuality;
+    static int targetFrameRate = DefaultTargetFrameRate;
 
     public static float MasterVolume => master;
     public static float MusicVolume => music;
     public static float Sensitivity => sensitivity;
     public static float Brightness => brightness;
     public static int QualityLevel => quality;
+    public static int TargetFrameRate => targetFrameRate;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Bootstrap()
@@ -58,6 +62,7 @@ public static class GameSettings
         sensitivity = Mathf.Clamp(PlayerPrefs.GetFloat(SensitivityKey, DefaultSensitivity), 0.1f, 2f);
         brightness = Mathf.Clamp01(PlayerPrefs.GetFloat(BrightnessKey, DefaultBrightness));
         quality = PlayerPrefs.GetInt(QualityKey, DefaultQuality);
+        targetFrameRate = PlayerPrefs.GetInt(TargetFrameRateKey, DefaultTargetFrameRate);
     }
 
     static void OnSceneLoaded(Scene _, LoadSceneMode __) => ApplyAll();
@@ -66,6 +71,7 @@ public static class GameSettings
     public static void ApplyAll()
     {
         AudioListener.volume = master;
+        ApplyTargetFrameRate();
         ApplyQuality();
         ApplyBrightness();
     }
@@ -113,7 +119,20 @@ public static class GameSettings
         ApplyQuality();
     }
 
+    public static void SetTargetFrameRate(int fps)
+    {
+        targetFrameRate = fps;
+        PlayerPrefs.SetInt(TargetFrameRateKey, targetFrameRate);
+        Save();
+        ApplyTargetFrameRate();
+    }
+
     // -------------------------------------------------------------- applying
+
+    static void ApplyTargetFrameRate()
+    {
+        Application.targetFrameRate = targetFrameRate;
+    }
 
     static void ApplyQuality()
     {
@@ -130,7 +149,7 @@ public static class GameSettings
     {
         float exposure = (brightness - 0.5f) * 2f;     // 0..1 -> -1..+1 EV
 
-        foreach (Volume volume in Object.FindObjectsByType<Volume>(FindObjectsSortMode.None))
+        foreach (Volume volume in Object.FindObjectsByType<Volume>())
         {
             if (volume.sharedProfile == null) continue;
 
