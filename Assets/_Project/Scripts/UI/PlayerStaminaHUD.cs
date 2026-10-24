@@ -43,6 +43,8 @@ public class PlayerStaminaHUD : MonoBehaviour
     private float fullTimer;
     private float currentOpacity = 0f;
     private float exhaustPulseTimer;
+    private int lastDisplayedPct = -1;
+    private string lastStatusTag = null;
 
     // Device safe area tracking
     private Rect appliedSafeArea;
@@ -138,31 +140,45 @@ public class PlayerStaminaHUD : MonoBehaviour
         if (percentLabel != null)
         {
             int pct = Mathf.RoundToInt(displayedNormalizedStamina * 100f);
-            percentLabel.text = pct.ToString("D2") + "%";
+            if (pct != lastDisplayedPct)
+            {
+                lastDisplayedPct = pct;
+                percentLabel.text = pct.ToString("D2") + "%";
+            }
         }
 
         // Status badge label
         if (statusLabel != null)
         {
+            string currentStatus;
+            Color statusCol;
+
             if (isExhausted)
             {
-                statusLabel.text = "[EXHAUSTED]";
-                statusLabel.style.color = colorDanger;
+                currentStatus = "[EXHAUSTED]";
+                statusCol = colorDanger;
             }
             else if (PlayerStamina.Instance != null && PlayerStamina.Instance.IsSprinting)
             {
-                statusLabel.text = "[DRAINING]";
-                statusLabel.style.color = colorMid;
+                currentStatus = "[DRAINING]";
+                statusCol = colorMid;
             }
             else if (displayedNormalizedStamina < 0.99f)
             {
-                statusLabel.text = "[RECHARGING]";
-                statusLabel.style.color = colorOptimal;
+                currentStatus = "[RECHARGING]";
+                statusCol = colorOptimal;
             }
             else
             {
-                statusLabel.text = "[RESTED]";
-                statusLabel.style.color = colorOptimal * 0.75f;
+                currentStatus = "[RESTED]";
+                statusCol = colorOptimal * 0.75f;
+            }
+
+            if (currentStatus != lastStatusTag)
+            {
+                lastStatusTag = currentStatus;
+                statusLabel.text = currentStatus;
+                statusLabel.style.color = statusCol;
             }
         }
 

@@ -27,7 +27,7 @@ Transform:
   m_GameObject: {fileID: 1907398326715195781}
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: -0, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: -3.4234297, y: -0.00000374376, z: -32.96395}
+  m_LocalPosition: {x: -3.4234297, y: -0.0000037437599, z: -32.96395}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -99,7 +99,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6512604369996529117}
-  - component: {fileID: 5636947818259589788}
+  - component: {fileID: 936431784814663555}
   m_Layer: 0
   m_Name: ChairWheel
   m_TagString: Untagged
@@ -124,7 +124,7 @@ Transform:
   - {fileID: 3721018123281864623}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &5636947818259589788
+--- !u!65 &936431784814663555
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -172,7 +172,7 @@ Transform:
   m_GameObject: {fileID: 7237929281507001088}
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: -0, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: -3.4234297, y: -0.00000374376, z: -32.96395}
+  m_LocalPosition: {x: -3.4234297, y: -0.0000037437599, z: -32.96395}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

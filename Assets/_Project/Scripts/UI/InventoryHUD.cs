@@ -53,6 +53,8 @@ public class InventoryHUD : MonoBehaviour
     private float targetSanity = 100f;
     private int currentBottles = 0;
     private float pulseTimer;
+    private int lastSanityPct = -1;
+    private string lastStatusTag = null;
 
     private readonly Color colorPhosphor = new Color(0.88f, 0.85f, 0.46f, 0.95f);  // #DFD876
     private readonly Color colorCaution = new Color(0.92f, 0.65f, 0.22f, 0.95f);   // Amber orange
@@ -144,6 +146,7 @@ public class InventoryHUD : MonoBehaviour
 
         Color activeColor;
         string statusTag;
+        bool isPsychosis = false;
 
         if (norm > 0.75f)
         {
@@ -163,14 +166,22 @@ public class InventoryHUD : MonoBehaviour
         else
         {
             // Pulsing critical warning
+            isPsychosis = true;
             float pulse = 0.7f + Mathf.Sin(pulseTimer * 2f) * 0.3f;
             activeColor = new Color(colorDanger.r, colorDanger.g * pulse, colorDanger.b * pulse, 0.98f);
             statusTag = "[PSYCHOSIS]";
         }
 
         sanityBarFill.style.backgroundColor = activeColor;
-        sanityPercentLabel.text = $"{Mathf.RoundToInt(displayedSanity)}% {statusTag}";
-        sanityPercentLabel.style.color = activeColor;
+
+        int currentPct = Mathf.RoundToInt(displayedSanity);
+        if (currentPct != lastSanityPct || statusTag != lastStatusTag || isPsychosis)
+        {
+            lastSanityPct = currentPct;
+            lastStatusTag = statusTag;
+            sanityPercentLabel.text = $"{currentPct}% {statusTag}";
+            sanityPercentLabel.style.color = activeColor;
+        }
     }
 
     private void RefreshInventoryDisplay()

@@ -48,6 +48,8 @@ public class CameraVHSGlitch : MonoBehaviour
     Text playText;
     Text dateText;
     RectTransform osdContainer;
+    int lastOsdSec = -1;
+    bool lastDotOn = false;
 
     // Post-processing references
     Volume atmosphereVolume;
@@ -429,24 +431,34 @@ public class CameraVHSGlitch : MonoBehaviour
         {
             // Blinking red dot every 1.2 seconds
             bool dotOn = (Mathf.FloorToInt(Time.timeSinceLevelLoad * 1.5f) % 2) == 0;
-            recText.text = dotOn ? "REC <color=#FF2222>●</color>" : "REC <color=#551111>●</color>";
+            if (dotOn != lastDotOn)
+            {
+                lastDotOn = dotOn;
+                recText.text = dotOn ? "REC <color=#FF2222>●</color>" : "REC <color=#551111>●</color>";
+            }
         }
 
         if (playText != null)
         {
             int totalSec = Mathf.FloorToInt(Time.timeSinceLevelLoad);
-            int hrs = totalSec / 3600;
-            int mins = (totalSec % 3600) / 60;
-            int secs = totalSec % 60;
+            bool heavyGlitch = glitch > 0.45f && UnityEngine.Random.value < 0.25f;
 
-            if (glitch > 0.45f && UnityEngine.Random.value < 0.25f)
+            if (totalSec != lastOsdSec || heavyGlitch)
             {
-                // Jitter/corrupt timecode under heavy glitch
-                playText.text = $"PLAY ▶   {hrs:00}:{mins:00}:{UnityEngine.Random.Range(0, 99):00}";
-            }
-            else
-            {
-                playText.text = $"PLAY ▶   {hrs:00}:{mins:00}:{secs:00}";
+                lastOsdSec = totalSec;
+                int hrs = totalSec / 3600;
+                int mins = (totalSec % 3600) / 60;
+                int secs = totalSec % 60;
+
+                if (heavyGlitch)
+                {
+                    // Jitter/corrupt timecode under heavy glitch
+                    playText.text = $"PLAY ▶   {hrs:00}:{mins:00}:{UnityEngine.Random.Range(0, 99):00}";
+                }
+                else
+                {
+                    playText.text = $"PLAY ▶   {hrs:00}:{mins:00}:{secs:00}";
+                }
             }
         }
 

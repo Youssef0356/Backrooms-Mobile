@@ -137,6 +137,7 @@ public static class GameSettings
 
     static void ApplyTargetFrameRate()
     {
+        QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = targetFrameRate;
     }
 
