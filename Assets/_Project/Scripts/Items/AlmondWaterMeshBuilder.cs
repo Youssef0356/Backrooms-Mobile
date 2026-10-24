@@ -158,10 +158,12 @@ public static class AlmondWaterMeshBuilder
         if (shader == null) shader = Shader.Find("Standard");
 
         Material mat = new Material(shader) { name = "AlmondWater_GlassMat" };
-        // Warm honey/amber glass tint
-        mat.color = new Color(0.92f, 0.76f, 0.44f, 0.92f);
-        if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.88f);
-        if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.15f);
+        // Rich warm amber medicinal glass bottle
+        Color amberGlass = new Color(0.72f, 0.40f, 0.12f, 1.0f);
+        mat.color = amberGlass;
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", amberGlass);
+        if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.92f);
+        if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.08f);
 
         _cachedBottleMaterial = mat;
         return mat;
@@ -177,8 +179,11 @@ public static class AlmondWaterMeshBuilder
         Material mat = new Material(shader) { name = "AlmondWater_LabelMat" };
         Texture2D labelTex = GetOrCreateLabelTexture();
         mat.mainTexture = labelTex;
-        if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.25f);
-        if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.05f);
+        if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", labelTex);
+        mat.color = Color.white;
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", Color.white);
+        if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.22f);
+        if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.02f);
 
         _cachedLabelMaterial = mat;
         return mat;

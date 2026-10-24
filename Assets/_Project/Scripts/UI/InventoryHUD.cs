@@ -6,10 +6,13 @@ using StarterAssets;
 /// <summary>
 /// Liminal phosphor terminal HUD for Player Inventory (Almond Water) and Mental Sanity.
 /// Features:
-/// 1. Quick-Drink Slot: shows Almond Water count with [Q] DRINK prompt (PC) or touchable DRINK button (Mobile).
-/// 2. World Pickup Prompt: "[E] PICK UP ALMOND WATER" / "[TAP TO PICK UP]" when looking at a bottle.
-/// 3. Sanity Status Monitor: analog CRT text & gauge bar ([LUCID] -> [PARANOIA] -> [PSYCHOSIS]).
-/// Auto-adapts between Mobile touch controls and PC desktop inputs.
+/// 1. Sanity Status Monitor: Telemetry CRT display pinned to the upper-left (beneath REC ●),
+///    completely avoiding collisions with the lower-left virtual joystick and VHS timecode.
+/// 2. Mobile Quick-Drink Button: A dedicated circular action button on the lower-right
+///    (stacked above Flashlight and Sprint buttons) for instant thumb access.
+/// 3. PC Quick-Drink Slot: Clean [Q] DRINK shortcut card beneath the Sanity Monitor.
+/// 4. World Pickup Prompt: Centered "[TAP] TAKE ALMOND WATER" / "[E] PICK UP ALMOND WATER".
+/// Auto-adapts cleanly between Mobile touch controls and PC desktop inputs.
 /// </summary>
 public class InventoryHUD : MonoBehaviour
 {
@@ -24,19 +27,24 @@ public class InventoryHUD : MonoBehaviour
     private VisualElement root;
     private VisualElement safeContainer;
 
-    // Sanity & Inventory Card (Bottom-Left)
-    private VisualElement statusCard;
+    // Sanity Monitor Card (Upper-Left, below REC ●)
+    private VisualElement sanityCard;
     private Label sanityTitleLabel;
     private Label sanityPercentLabel;
     private VisualElement sanityBarTrack;
     private VisualElement sanityBarFill;
 
-    private VisualElement inventoryRow;
-    private VisualElement bottleIcon;
-    private Label bottleCountLabel;
-    private Button drinkButton;
+    // Mobile Drink Action Button (Lower-Right thumb cluster)
+    private VisualElement mobileDrinkButton;
+    private Label mobileDrinkLabel;
+    private Label mobileBadgeLabel;
 
-    // Pickup Prompt Card (Center)
+    // PC Inventory Quick-Slot (Upper-Left, below Sanity Card)
+    private VisualElement pcInventoryCard;
+    private Label pcDrinkLabel;
+    private Label pcCountLabel;
+
+    // Pickup Prompt Card (Centered)
     private VisualElement pickupCard;
     private Label pickupKeyLabel;
     private Label pickupActionLabel;
@@ -49,8 +57,8 @@ public class InventoryHUD : MonoBehaviour
     private readonly Color colorPhosphor = new Color(0.88f, 0.85f, 0.46f, 0.95f);  // #DFD876
     private readonly Color colorCaution = new Color(0.92f, 0.65f, 0.22f, 0.95f);   // Amber orange
     private readonly Color colorDanger = new Color(0.92f, 0.25f, 0.20f, 0.98f);    // Critical red
-    private readonly Color colorDarkBack = new Color(0.04f, 0.05f, 0.04f, 0.82f);
-    private readonly Color colorBorder = new Color(0.88f, 0.85f, 0.46f, 0.35f);
+    private readonly Color colorDarkBack = new Color(0.04f, 0.05f, 0.04f, 0.85f);
+    private readonly Color colorBorder = new Color(0.88f, 0.85f, 0.46f, 0.40f);
 
     private static bool IsMobile => PlatformUtils.IsMobile;
 
@@ -107,7 +115,10 @@ public class InventoryHUD : MonoBehaviour
         if (root == null) return;
 
         bool paused = PauseMenuController.IsPaused || GameOverController.IsGameOver || VictoryController.IsGameWon;
-        statusCard.style.display = paused ? DisplayStyle.None : DisplayStyle.Flex;
+
+        if (sanityCard != null) sanityCard.style.display = paused ? DisplayStyle.None : DisplayStyle.Flex;
+        if (mobileDrinkButton != null) mobileDrinkButton.style.display = (paused || !IsMobile) ? DisplayStyle.None : DisplayStyle.Flex;
+        if (pcInventoryCard != null) pcInventoryCard.style.display = (paused || IsMobile) ? DisplayStyle.None : DisplayStyle.Flex;
 
         if (paused)
         {
@@ -164,26 +175,21 @@ public class InventoryHUD : MonoBehaviour
 
     private void RefreshInventoryDisplay()
     {
-        if (bottleCountLabel != null)
+        bool hasBottles = currentBottles > 0;
+
+        // Mobile button
+        if (mobileDrinkButton != null)
         {
-            bottleCountLabel.text = $"x{currentBottles}";
+            if (mobileBadgeLabel != null) mobileBadgeLabel.text = $"x{currentBottles}";
+            mobileDrinkButton.style.opacity = hasBottles ? 1f : 0.40f;
+            mobileDrinkButton.pickingMode = hasBottles ? PickingMode.Position : PickingMode.Ignore;
         }
 
-        if (drinkButton != null)
+        // PC slot
+        if (pcInventoryCard != null)
         {
-            bool hasBottles = currentBottles > 0;
-            drinkButton.SetEnabled(hasBottles);
-
-            if (IsMobile)
-            {
-                drinkButton.text = hasBottles ? "DRINK" : "EMPTY";
-            }
-            else
-            {
-                drinkButton.text = hasBottles ? "[Q] DRINK" : "[EMPTY]";
-            }
-
-            drinkButton.style.opacity = hasBottles ? 1f : 0.45f;
+            if (pcCountLabel != null) pcCountLabel.text = $"x{currentBottles}";
+            pcInventoryCard.style.opacity = hasBottles ? 1f : 0.50f;
         }
     }
 
@@ -251,15 +257,23 @@ public class InventoryHUD : MonoBehaviour
         safeContainer.style.bottom = 0;
         root.Add(safeContainer);
 
-        // 1. Sanity & Inventory Card (Bottom-Left)
-        statusCard = BuildStatusCard();
-        safeContainer.Add(statusCard);
+        // 1. Sanity Monitor Card (Upper-Left beneath REC ●)
+        sanityCard = BuildSanityCard();
+        safeContainer.Add(sanityCard);
 
-        // 2. Pickup Prompt Card (Centered)
+        // 2. Mobile Quick-Drink Button (Lower-Right above Flashlight)
+        mobileDrinkButton = BuildMobileDrinkButton();
+        safeContainer.Add(mobileDrinkButton);
+
+        // 3. PC Quick-Slot Card (Upper-Left beneath Sanity Monitor)
+        pcInventoryCard = BuildPCInventoryCard();
+        safeContainer.Add(pcInventoryCard);
+
+        // 4. Pickup Prompt Card (Centered)
         pickupCard = BuildPickupCard();
         safeContainer.Add(pickupCard);
 
-        // Initial refresh
+        // Initial state
         if (PlayerSanity.Instance != null)
         {
             displayedSanity = targetSanity = PlayerSanity.Instance.CurrentSanity;
@@ -271,14 +285,14 @@ public class InventoryHUD : MonoBehaviour
         RefreshInventoryDisplay();
     }
 
-    private VisualElement BuildStatusCard()
+    private VisualElement BuildSanityCard()
     {
         VisualElement card = new VisualElement();
         card.pickingMode = PickingMode.Ignore;
         card.style.position = Position.Absolute;
-        card.style.left = 28;
-        card.style.bottom = 24;
-        card.style.width = 280;
+        card.style.left = 42;
+        card.style.top = 74; // Positioned cleanly under REC ●
+        card.style.width = 270;
         card.style.backgroundColor = colorDarkBack;
         card.style.borderLeftColor = colorBorder;
         card.style.borderRightColor = colorBorder;
@@ -294,31 +308,31 @@ public class InventoryHUD : MonoBehaviour
         card.style.borderBottomRightRadius = 4;
         card.style.paddingLeft = 12;
         card.style.paddingRight = 12;
-        card.style.paddingTop = 10;
-        card.style.paddingBottom = 10;
+        card.style.paddingTop = 8;
+        card.style.paddingBottom = 8;
 
-        // ---- Sanity Header Row ----
-        VisualElement sanityRow = new VisualElement();
-        sanityRow.style.flexDirection = FlexDirection.Row;
-        sanityRow.style.justifyContent = Justify.SpaceBetween;
-        sanityRow.style.marginBottom = 5;
+        // Header Row: Title & Status
+        VisualElement row = new VisualElement();
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.justifyContent = Justify.SpaceBetween;
+        row.style.marginBottom = 6;
 
         sanityTitleLabel = new Label("SANITY MONITOR");
         ApplyFont(sanityTitleLabel, 11, true);
-        sanityTitleLabel.style.color = colorPhosphor * 0.75f;
-        sanityRow.Add(sanityTitleLabel);
+        sanityTitleLabel.style.color = colorPhosphor * 0.8f;
+        row.Add(sanityTitleLabel);
 
         sanityPercentLabel = new Label("100% [LUCID]");
         ApplyFont(sanityPercentLabel, 11, true);
         sanityPercentLabel.style.color = colorPhosphor;
-        sanityRow.Add(sanityPercentLabel);
+        row.Add(sanityPercentLabel);
 
-        card.Add(sanityRow);
+        card.Add(row);
 
-        // ---- Sanity Bar Track ----
+        // Bar Track & Fill
         sanityBarTrack = new VisualElement();
-        sanityBarTrack.style.height = 7;
-        sanityBarTrack.style.backgroundColor = new Color(0.12f, 0.14f, 0.10f, 0.95f);
+        sanityBarTrack.style.height = 6;
+        sanityBarTrack.style.backgroundColor = new Color(0.10f, 0.12f, 0.08f, 0.95f);
         sanityBarTrack.style.borderLeftWidth = 1;
         sanityBarTrack.style.borderRightWidth = 1;
         sanityBarTrack.style.borderTopWidth = 1;
@@ -327,7 +341,6 @@ public class InventoryHUD : MonoBehaviour
         sanityBarTrack.style.borderRightColor = colorBorder * 0.6f;
         sanityBarTrack.style.borderTopColor = colorBorder * 0.6f;
         sanityBarTrack.style.borderBottomColor = colorBorder * 0.6f;
-        sanityBarTrack.style.marginBottom = 10;
 
         sanityBarFill = new VisualElement();
         sanityBarFill.style.height = Length.Percent(100);
@@ -336,71 +349,121 @@ public class InventoryHUD : MonoBehaviour
         sanityBarTrack.Add(sanityBarFill);
 
         card.Add(sanityBarTrack);
+        return card;
+    }
 
-        // ---- Inventory Almond Water Row ----
-        inventoryRow = new VisualElement();
-        inventoryRow.style.flexDirection = FlexDirection.Row;
-        inventoryRow.style.alignItems = Align.Center;
-        inventoryRow.style.justifyContent = Justify.SpaceBetween;
-        inventoryRow.style.borderTopWidth = 1;
-        inventoryRow.style.borderTopColor = colorBorder * 0.4f;
-        inventoryRow.style.paddingTop = 7;
+    private VisualElement BuildMobileDrinkButton()
+    {
+        // Circular action button stacked on right thumb column:
+        // Sprint (bottom: 30), Flashlight (bottom: 160), Drink (bottom: 285)
+        VisualElement btn = new VisualElement();
+        btn.pickingMode = PickingMode.Position;
+        btn.style.position = Position.Absolute;
+        btn.style.right = 40;
+        btn.style.bottom = 285;
+        btn.style.width = 95;
+        btn.style.height = 95;
+        btn.style.backgroundColor = new Color(0.06f, 0.08f, 0.06f, 0.82f);
+        btn.style.borderLeftColor = colorPhosphor;
+        btn.style.borderRightColor = colorPhosphor;
+        btn.style.borderTopColor = colorPhosphor;
+        btn.style.borderBottomColor = colorPhosphor;
+        btn.style.borderLeftWidth = 2;
+        btn.style.borderRightWidth = 2;
+        btn.style.borderTopWidth = 2;
+        btn.style.borderBottomWidth = 2;
+        btn.style.borderTopLeftRadius = 48;
+        btn.style.borderTopRightRadius = 48;
+        btn.style.borderBottomLeftRadius = 48;
+        btn.style.borderBottomRightRadius = 48;
+        btn.style.alignItems = Align.Center;
+        btn.style.justifyContent = Justify.Center;
 
-        // Left info: Icon & Name & Count
-        VisualElement leftInfo = new VisualElement();
-        leftInfo.style.flexDirection = FlexDirection.Row;
-        leftInfo.style.alignItems = Align.Center;
+        // Small top icon/tag
+        Label iconTag = new Label("ALMOND");
+        ApplyFont(iconTag, 9, true);
+        iconTag.style.color = colorPhosphor * 0.75f;
+        btn.Add(iconTag);
 
-        // Small amber icon glyph
-        Label iconLabel = new Label("◆");
-        ApplyFont(iconLabel, 12, false);
-        iconLabel.style.color = colorPhosphor;
-        iconLabel.style.marginRight = 6;
-        leftInfo.Add(iconLabel);
+        mobileDrinkLabel = new Label("DRINK");
+        ApplyFont(mobileDrinkLabel, 14, true);
+        mobileDrinkLabel.style.color = colorPhosphor;
+        btn.Add(mobileDrinkLabel);
 
-        Label itemName = new Label("ALMOND WATER");
-        ApplyFont(itemName, 12, true);
-        itemName.style.color = colorPhosphor;
-        itemName.style.marginRight = 8;
-        leftInfo.Add(itemName);
+        // Quantity Badge (Upper-Right corner)
+        mobileBadgeLabel = new Label("x0");
+        ApplyFont(mobileBadgeLabel, 11, true);
+        mobileBadgeLabel.style.position = Position.Absolute;
+        mobileBadgeLabel.style.top = -4;
+        mobileBadgeLabel.style.right = -4;
+        mobileBadgeLabel.style.backgroundColor = colorPhosphor;
+        mobileBadgeLabel.style.color = colorDarkBack;
+        mobileBadgeLabel.style.paddingLeft = 5;
+        mobileBadgeLabel.style.paddingRight = 5;
+        mobileBadgeLabel.style.paddingTop = 2;
+        mobileBadgeLabel.style.paddingBottom = 2;
+        mobileBadgeLabel.style.borderTopLeftRadius = 10;
+        mobileBadgeLabel.style.borderTopRightRadius = 10;
+        mobileBadgeLabel.style.borderBottomLeftRadius = 10;
+        mobileBadgeLabel.style.borderBottomRightRadius = 10;
+        btn.Add(mobileBadgeLabel);
 
-        bottleCountLabel = new Label("x0");
-        ApplyFont(bottleCountLabel, 12, true);
-        bottleCountLabel.style.color = colorCaution;
-        leftInfo.Add(bottleCountLabel);
-
-        inventoryRow.Add(leftInfo);
-
-        // Right: Drink Button / Prompt
-        drinkButton = new Button();
-        drinkButton.pickingMode = PickingMode.Position;
-        ApplyFont(drinkButton, 12, true);
-        drinkButton.text = IsMobile ? "DRINK" : "[Q] DRINK";
-        drinkButton.style.color = colorDarkBack;
-        drinkButton.style.backgroundColor = colorPhosphor;
-        drinkButton.style.borderLeftWidth = 0;
-        drinkButton.style.borderRightWidth = 0;
-        drinkButton.style.borderTopWidth = 0;
-        drinkButton.style.borderBottomWidth = 0;
-        drinkButton.style.borderTopLeftRadius = 3;
-        drinkButton.style.borderTopRightRadius = 3;
-        drinkButton.style.borderBottomLeftRadius = 3;
-        drinkButton.style.borderBottomRightRadius = 3;
-        drinkButton.style.paddingLeft = 10;
-        drinkButton.style.paddingRight = 10;
-        drinkButton.style.paddingTop = 4;
-        drinkButton.style.paddingBottom = 4;
-
-        drinkButton.clicked += () =>
+        // Touch feedback & click event
+        btn.RegisterCallback<PointerDownEvent>(evt =>
         {
+            btn.style.backgroundColor = new Color(0.92f, 0.88f, 0.50f, 0.35f);
+        });
+
+        btn.RegisterCallback<PointerUpEvent>(evt =>
+        {
+            btn.style.backgroundColor = new Color(0.06f, 0.08f, 0.06f, 0.82f);
             if (PlayerInventory.Instance != null)
             {
                 PlayerInventory.Instance.UseAlmondWater();
             }
-        };
+        });
 
-        inventoryRow.Add(drinkButton);
-        card.Add(inventoryRow);
+        return btn;
+    }
+
+    private VisualElement BuildPCInventoryCard()
+    {
+        VisualElement card = new VisualElement();
+        card.pickingMode = PickingMode.Ignore;
+        card.style.position = Position.Absolute;
+        card.style.left = 42;
+        card.style.top = 125;
+        card.style.width = 270;
+        card.style.backgroundColor = colorDarkBack;
+        card.style.borderLeftColor = colorBorder;
+        card.style.borderRightColor = colorBorder;
+        card.style.borderTopColor = colorBorder;
+        card.style.borderBottomColor = colorBorder;
+        card.style.borderLeftWidth = 1.5f;
+        card.style.borderRightWidth = 1.5f;
+        card.style.borderTopWidth = 1.5f;
+        card.style.borderBottomWidth = 1.5f;
+        card.style.borderTopLeftRadius = 4;
+        card.style.borderTopRightRadius = 4;
+        card.style.borderBottomLeftRadius = 4;
+        card.style.borderBottomRightRadius = 4;
+        card.style.paddingLeft = 12;
+        card.style.paddingRight = 12;
+        card.style.paddingTop = 6;
+        card.style.paddingBottom = 6;
+        card.style.flexDirection = FlexDirection.Row;
+        card.style.alignItems = Align.Center;
+        card.style.justifyContent = Justify.SpaceBetween;
+
+        pcDrinkLabel = new Label("[Q] DRINK ALMOND WATER");
+        ApplyFont(pcDrinkLabel, 11, true);
+        pcDrinkLabel.style.color = colorPhosphor;
+        card.Add(pcDrinkLabel);
+
+        pcCountLabel = new Label("x0");
+        ApplyFont(pcCountLabel, 12, true);
+        pcCountLabel.style.color = colorCaution;
+        card.Add(pcCountLabel);
 
         return card;
     }
@@ -411,7 +474,7 @@ public class InventoryHUD : MonoBehaviour
         card.pickingMode = PickingMode.Position;
         card.style.position = Position.Absolute;
         card.style.left = Length.Percent(50);
-        card.style.bottom = 120;
+        card.style.bottom = 135;
         card.style.translate = new StyleTranslate(new Translate(Length.Percent(-50), 0, 0));
         card.style.backgroundColor = colorDarkBack;
         card.style.borderLeftColor = colorPhosphor;
@@ -426,10 +489,10 @@ public class InventoryHUD : MonoBehaviour
         card.style.borderTopRightRadius = 4;
         card.style.borderBottomLeftRadius = 4;
         card.style.borderBottomRightRadius = 4;
-        card.style.paddingLeft = 16;
-        card.style.paddingRight = 16;
-        card.style.paddingTop = 8;
-        card.style.paddingBottom = 8;
+        card.style.paddingLeft = 18;
+        card.style.paddingRight = 18;
+        card.style.paddingTop = 9;
+        card.style.paddingBottom = 9;
         card.style.flexDirection = FlexDirection.Row;
         card.style.alignItems = Align.Center;
         card.style.display = DisplayStyle.None;
@@ -445,8 +508,8 @@ public class InventoryHUD : MonoBehaviour
         pickupActionLabel.style.color = colorPhosphor;
         card.Add(pickupActionLabel);
 
-        // Click on pickup card to interact (touch friendly)
-        card.RegisterCallback<ClickEvent>(evt =>
+        // Click / touch to collect
+        card.RegisterCallback<PointerDownEvent>(evt =>
         {
             if (PlayerInventory.Instance != null)
             {
