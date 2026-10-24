@@ -160,6 +160,12 @@ public class VillainAI : MonoBehaviour
     bool isPivotingOnSpot;
     float currentForwardSpeed;
 
+    // Anti-stuck watchdog & patrol flow tracking
+    Vector3 lastStuckCheckPos;
+    float stuckTimer;
+    float wanderTimeoutTimer;
+    float pivotTimeoutTimer;
+
     bool hasTeleported;
     bool hasCaught;
 
@@ -300,6 +306,10 @@ public class VillainAI : MonoBehaviour
         FindHeadBone();
         SetupChaseAudio();
         previousYaw = transform.eulerAngles.y;
+        lastStuckCheckPos = transform.position;
+        stuckTimer = 0f;
+        wanderTimeoutTimer = 0f;
+        pivotTimeoutTimer = 0f;
 
         if (agent != null && agent.isOnNavMesh)
         {
@@ -354,6 +364,7 @@ public class VillainAI : MonoBehaviour
         if (agent == null || !agent.isOnNavMesh) return;
 
         CheckReposition();
+        UpdateAntiStuckWatchdog();
         if (customTurning) UpdateRotationAndVelocity();
         SyncAnimationSpeed();
 
@@ -476,8 +487,26 @@ public class VillainAI : MonoBehaviour
             return;
         }
 
+        // If path is missing or invalid, do not wait: immediately pick a valid reachable point
+        if (!agent.pathPending && (!agent.hasPath || agent.pathStatus == NavMeshPathStatus.PathInvalid))
+        {
+            agent.isStopped = false;
+            GoToRandomPoint();
+            return;
+        }
+
+        // Wander timeout watchdog: if stuck or taking longer than 13s towards a point, pick a fresh point
+        wanderTimeoutTimer += Time.deltaTime;
+        if (wanderTimeoutTimer > 13f)
+        {
+            wanderTimeoutTimer = 0f;
+            agent.isStopped = false;
+            GoToRandomPoint();
+            return;
+        }
+
         // Reached the wander point? Stop, wait, then pick a new one.
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.25f)
+        if (!agent.pathPending && agent.hasPath && agent.remainingDistance <= agent.stoppingDistance + 0.30f)
         {
             agent.isStopped = true;
             agent.velocity = Vector3.zero;
@@ -486,9 +515,15 @@ public class VillainAI : MonoBehaviour
             if (waitTimer >= waitAtPoint)
             {
                 waitTimer = 0f;
+                wanderTimeoutTimer = 0f;
                 agent.isStopped = false;
                 GoToRandomPoint();
             }
+        }
+        else if (agent.hasPath && agent.remainingDistance > agent.stoppingDistance + 0.30f)
+        {
+            waitTimer = 0f;
+            if (agent.isStopped) agent.isStopped = false;
         }
     }
 
@@ -553,7 +588,18 @@ public class VillainAI : MonoBehaviour
         }
 
         // Moving towards investigate point
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.4f)
+        if (!agent.pathPending && (!agent.hasPath || agent.pathStatus == NavMeshPathStatus.PathInvalid))
+        {
+            // Path invalid, return to wander
+            currentState = State.Wander;
+            agent.speed = wanderSpeed;
+            SetChasing(false);
+            agent.isStopped = false;
+            GoToRandomPoint();
+            return;
+        }
+
+        if (!agent.pathPending && agent.hasPath && agent.remainingDistance <= agent.stoppingDistance + 0.4f)
         {
             // Reached spot: pause and listen
             isPausedSearching = true;
@@ -713,12 +759,19 @@ public class VillainAI : MonoBehaviour
 
     Vector3 GetNearbySearchSpot(Vector3 origin, float radius)
     {
-        for (int i = 0; i < 8; i++)
+        NavMeshPath path = new NavMeshPath();
+        for (int i = 0; i < 10; i++)
         {
             Vector3 randomPoint = origin + Random.insideUnitSphere * radius;
             if (NavMesh.SamplePosition(randomPoint, out NavMeshHit navHit, radius, NavMesh.AllAreas))
             {
-                return navHit.position;
+                if (NavMesh.CalculatePath(transform.position, navHit.position, NavMesh.AllAreas, path))
+                {
+                    if (path.status == NavMeshPathStatus.PathComplete && path.corners.Length >= 2)
+                    {
+                        return navHit.position;
+                    }
+                }
             }
         }
         return origin;
@@ -728,28 +781,67 @@ public class VillainAI : MonoBehaviour
     {
         if (agent == null || !agent.isOnNavMesh) return;
 
-        // Forward-biased patrol: look ahead down corridors (prevents pacing backward and forward aimlessly)
-        for (int i = 0; i < 5; i++)
-        {
-            Vector3 forwardBias = transform.forward * wanderRadius * Random.Range(0.6f, 1.0f);
-            Vector3 lateralBias = transform.right * Random.Range(-wanderRadius * 0.35f, wanderRadius * 0.35f);
-            Vector3 target = transform.position + forwardBias + lateralBias;
+        agent.isStopped = false;
+        wanderTimeoutTimer = 0f;
 
-            if (NavMesh.SamplePosition(target, out NavMeshHit hit, wanderRadius * 0.5f, NavMesh.AllAreas))
+        NavMeshPath testPath = new NavMeshPath();
+
+        // 1. Try corridor sweep angles from forward to reverse (0, +30, -30, +60, -60, +90, -90, +135, -135, 180)
+        // If facing a dead-end wall, sweeping to 180 ensures he turns around and patrols back out cleanly!
+        float[] angles = new float[] { 0f, 30f, -30f, 60f, -60f, 90f, -90f, 135f, -135f, 180f };
+        for (int i = 0; i < angles.Length; i++)
+        {
+            Quaternion rot = Quaternion.Euler(0f, angles[i], 0f);
+            Vector3 dir = rot * transform.forward;
+            float dist = Random.Range(wanderRadius * 0.5f, wanderRadius);
+            Vector3 target = transform.position + dir * dist;
+
+            if (NavMesh.SamplePosition(target, out NavMeshHit hit, 4.0f, NavMesh.AllAreas))
             {
-                if (Vector3.Dot(transform.forward, (hit.position - transform.position).normalized) > 0.2f)
+                if (NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, testPath))
                 {
-                    agent.SetDestination(hit.position);
-                    return;
+                    if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
+                    {
+                        agent.SetPath(testPath);
+                        return;
+                    }
                 }
             }
         }
 
-        // Fallback if at a corner/dead-end
-        Vector3 random = transform.position + Random.insideUnitSphere * wanderRadius;
-        if (NavMesh.SamplePosition(random, out NavMeshHit navHit, wanderRadius, NavMesh.AllAreas))
+        // 2. Patrol bias towards an area near the player (keeps creature active in the gameplay loop)
+        if (player != null)
         {
-            agent.SetDestination(navHit.position);
+            Vector2 stalkDir = Random.insideUnitCircle.normalized;
+            Vector3 stalkSpot = player.position + new Vector3(stalkDir.x, 0f, stalkDir.y) * Random.Range(14f, 24f);
+            if (NavMesh.SamplePosition(stalkSpot, out NavMeshHit stalkHit, 6.0f, NavMesh.AllAreas))
+            {
+                if (NavMesh.CalculatePath(transform.position, stalkHit.position, NavMesh.AllAreas, testPath))
+                {
+                    if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
+                    {
+                        agent.SetPath(testPath);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback: Any reachable point in a full circle
+        for (int i = 0; i < 10; i++)
+        {
+            Vector3 random = transform.position + Random.insideUnitSphere * wanderRadius;
+            if (NavMesh.SamplePosition(random, out NavMeshHit navHit, 5.0f, NavMesh.AllAreas))
+            {
+                if (NavMesh.CalculatePath(transform.position, navHit.position, NavMesh.AllAreas, testPath))
+                {
+                    if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
+                    {
+                        agent.SetPath(testPath);
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -785,6 +877,53 @@ public class VillainAI : MonoBehaviour
             case State.Investigate: return investigateSpeed;
             case State.VentWait: return investigateSpeed;
             default: return wanderSpeed;
+        }
+    }
+
+    void UpdateAntiStuckWatchdog()
+    {
+        if (hasCaught || playerHiddenInVent || PlayerVentController.IsInVent) return;
+
+        bool isAttemptingMovement = (currentState == State.Wander || currentState == State.Investigate || currentState == State.Chase);
+        if (!isAttemptingMovement || agent == null || !agent.isOnNavMesh || agent.isStopped)
+        {
+            stuckTimer = 0f;
+            lastStuckCheckPos = transform.position;
+            return;
+        }
+
+        float moved = Vector3.Distance(transform.position, lastStuckCheckPos);
+        if (moved < 0.15f)
+        {
+            stuckTimer += Time.deltaTime;
+            // If physically stuck in one spot for more than 2.8 seconds while trying to move
+            if (stuckTimer >= 2.8f)
+            {
+                stuckTimer = 0f;
+                lastStuckCheckPos = transform.position;
+
+                isPivotingOnSpot = false;
+                agent.isStopped = false;
+                agent.velocity = Vector3.zero;
+
+                if (currentState == State.Chase && player != null)
+                {
+                    agent.ResetPath();
+                    agent.SetDestination(player.position);
+                }
+                else
+                {
+                    // Force reverse rotation away from the obstacle
+                    transform.rotation = Quaternion.Euler(0f, transform.eulerAngles.y + 180f, 0f);
+                    agent.ResetPath();
+                    GoToRandomPoint();
+                }
+            }
+        }
+        else
+        {
+            lastStuckCheckPos = transform.position;
+            stuckTimer = 0f;
         }
     }
 
@@ -825,11 +964,24 @@ public class VillainAI : MonoBehaviour
             if (!isPivotingOnSpot && angleDelta > turnAngleThreshold)
             {
                 isPivotingOnSpot = true;
+                pivotTimeoutTimer = 0f;
             }
             // Finish in-place turn once aligned within tolerance
             else if (isPivotingOnSpot && angleDelta <= turnExitAngleThreshold)
             {
                 isPivotingOnSpot = false;
+                pivotTimeoutTimer = 0f;
+            }
+
+            if (isPivotingOnSpot)
+            {
+                pivotTimeoutTimer += Time.deltaTime;
+                if (pivotTimeoutTimer > 0.85f)
+                {
+                    // Never let pivoting in place lock the monster indefinitely
+                    isPivotingOnSpot = false;
+                    pivotTimeoutTimer = 0f;
+                }
             }
 
             // Pivot towards the target direction

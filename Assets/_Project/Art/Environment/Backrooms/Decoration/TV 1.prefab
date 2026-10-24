@@ -99,7 +99,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 357136686455934127}
-  - component: {fileID: 8205319881590276918}
+  - component: {fileID: 2515901090926638939}
   m_Layer: 0
   m_Name: TV 1
   m_TagString: Untagged
@@ -133,7 +133,7 @@ Transform:
   - {fileID: 1378409481710654076}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &8205319881590276918
+--- !u!65 &2515901090926638939
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
