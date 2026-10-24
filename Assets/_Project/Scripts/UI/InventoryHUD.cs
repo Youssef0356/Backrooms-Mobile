@@ -229,21 +229,23 @@ public class InventoryHUD : MonoBehaviour
     {
         font = Resources.Load<Font>(fontResourcePath);
 
-        panelSettings = Resources.Load<PanelSettings>("MenuPanelSettings");
-        if (panelSettings == null)
+        PanelSettings baseSettings = Resources.Load<PanelSettings>("MenuPanelSettings");
+        panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+        if (baseSettings != null)
         {
-            panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-            panelSettings.name = "Inventory HUD Panel Settings";
-            panelSettings.renderMode = PanelRenderMode.ScreenSpaceOverlay;
-            panelSettings.sortingOrder = 21;
-            panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-            panelSettings.referenceResolution = new Vector2Int(1920, 1080);
-            panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
-            panelSettings.match = 0.5f;
+            panelSettings.themeUss = baseSettings.themeUss;
         }
+        panelSettings.name = "Inventory HUD Panel Settings";
+        panelSettings.renderMode = PanelRenderMode.ScreenSpaceOverlay;
+        panelSettings.sortingOrder = 25; // Renders in front of Camera VHS overlay (2)
+        panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+        panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+        panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+        panelSettings.match = 0.5f;
 
         document = gameObject.AddComponent<UIDocument>();
         document.panelSettings = panelSettings;
+        document.sortingOrder = 25;
 
         root = document.rootVisualElement;
         root.pickingMode = PickingMode.Ignore;

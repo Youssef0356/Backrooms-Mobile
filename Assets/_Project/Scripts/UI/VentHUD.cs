@@ -168,6 +168,7 @@ public class VentHUD : MonoBehaviour
 
         document = gameObject.AddComponent<UIDocument>();
         document.panelSettings = panelSettings;
+        document.sortingOrder = 30;
 
         root = document.rootVisualElement;
         root.pickingMode = PickingMode.Ignore;

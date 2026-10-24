@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8107876999976877546}
-  - component: {fileID: 1064254940831681156}
+  - component: {fileID: 6048260248652619045}
   m_Layer: 0
   m_Name: ModernTable
   m_TagString: Untagged
@@ -33,7 +33,7 @@ Transform:
   - {fileID: 1578173597296767741}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1064254940831681156
+--- !u!65 &6048260248652619045
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

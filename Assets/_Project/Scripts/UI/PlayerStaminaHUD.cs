@@ -242,6 +242,7 @@ public class PlayerStaminaHUD : MonoBehaviour
 
         document = gameObject.AddComponent<UIDocument>();
         document.panelSettings = panelSettings;
+        document.sortingOrder = 20;
 
         root = document.rootVisualElement;
         root.pickingMode = PickingMode.Ignore;

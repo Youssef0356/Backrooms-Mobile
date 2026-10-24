@@ -175,7 +175,7 @@ public class CameraVHSGlitch : MonoBehaviour
 
         vhsCanvas = canvasObj.AddComponent<Canvas>();
         vhsCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        vhsCanvas.sortingOrder = 999; // Render above 3D world, below interactive UI buttons
+        vhsCanvas.sortingOrder = 2; // Render directly above 3D world, below all interactive HUDs and touch buttons
 
         CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
