@@ -88,7 +88,7 @@ public class MenuCameraHUD : MonoBehaviour
         }
 
         document.pivot = Pivot.Center;
-        document.pivotReferenceSize = PivotReferenceSize.Fixed;
+        document.pivotReferenceSize = PivotReferenceSize.Layout;
 
         if (transform.localPosition != centerLocal) transform.localPosition = centerLocal;
         if (transform.localRotation != Quaternion.identity) transform.localRotation = Quaternion.identity;
