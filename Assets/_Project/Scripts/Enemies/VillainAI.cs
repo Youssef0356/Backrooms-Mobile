@@ -114,10 +114,26 @@ public class VillainAI : MonoBehaviour
     [Tooltip("Random pitch range applied to each chase noise for organic horror variation.")]
     public Vector2 chasePitchRange = new Vector2(0.92f, 1.08f);
 
-    public enum State { Wander, Investigate, Chase }
+    [Header("Vent Hiding")]
+    [Tooltip("Min / max seconds he lingers at the vent the player vanished into before giving up and wandering off.")]
+    public Vector2 ventLingerTime = new Vector2(5f, 8f);
+
+    public enum State { Wander, Investigate, Chase, VentWait }
     [Header("Debug Info")]
     public State currentState = State.Wander;
     public State CurrentState => currentState;
+
+    // ---- Vent hiding runtime ----
+    bool playerHiddenInVent;
+    Vector3 ventFrontPoint;
+    Vector3 ventLookPoint;
+    bool ventArrived;
+    float ventApproachTimer;
+    float ventLingerTimer;
+    float ventLingerDuration;
+
+    /// <summary>True while the player is crouched inside a wall vent (he can't see, hear or catch the player).</summary>
+    public bool PlayerHiddenInVent => playerHiddenInVent;
 
     NavMeshAgent agent;
     Animator anim;
@@ -227,6 +243,19 @@ public class VillainAI : MonoBehaviour
     {
         agent = GetComponent<NavMeshAgent>();
         anim = GetComponentInChildren<Animator>();
+        if (anim == null) anim = GetComponent<Animator>();
+
+        if (anim != null)
+        {
+            anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            anim.applyRootMotion = false;
+        }
+
+        if (transform.localScale.x > 0.5f && gameObject.name.ToLowerInvariant().Contains("clark"))
+        {
+            transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
+        }
+
         CacheAnimatorParameters();
         SetChasing(false);
 
@@ -252,15 +281,15 @@ public class VillainAI : MonoBehaviour
         currentState = State.Wander;
         agent.speed = wanderSpeed;
 
-        if (customTurning && agent != null)
-        {
-            agent.updateRotation = false;
-            agent.acceleration = 12f;
-        }
-
         if (agent != null)
         {
+            agent.radius = 0.4f;
             agent.baseOffset = groundOffset;
+            if (customTurning)
+            {
+                agent.updateRotation = false;
+                agent.acceleration = 14f;
+            }
         }
 
         if (transform.childCount > 0)
@@ -283,7 +312,13 @@ public class VillainAI : MonoBehaviour
         if (agent == null) agent = GetComponent<NavMeshAgent>();
         if (agent != null)
         {
+            agent.radius = 0.4f;
             agent.baseOffset = groundOffset;
+            if (customTurning)
+            {
+                agent.updateRotation = false;
+                agent.acceleration = 14f;
+            }
         }
 
         if (agent != null && agent.isOnNavMesh)
@@ -337,6 +372,97 @@ public class VillainAI : MonoBehaviour
             case State.Chase:
                 UpdateChase(canSee);
                 break;
+
+            case State.VentWait:
+                UpdateVentWait(canSee);
+                break;
+        }
+    }
+
+    // ---------------- Vent Hiding ----------------
+
+    /// <summary>
+    /// Called when the player ducks into a vent. A chasing villain loses the trail, walks to the
+    /// grille the player vanished behind, lingers there, then gives up and goes back to wandering.
+    /// </summary>
+    public void OnPlayerHidInVent(Vector3 frontPoint, Vector3 lookPoint)
+    {
+        playerHiddenInVent = true;
+        ventFrontPoint = frontPoint;
+        ventLookPoint = lookPoint;
+
+        if (currentState != State.Chase && currentState != State.Investigate) return;
+        if (agent == null || !agent.isActiveAndEnabled || !agent.isOnNavMesh) return;
+
+        currentState = State.VentWait;
+        ventArrived = false;
+        ventApproachTimer = 0f;
+        ventLingerTimer = 0f;
+        ventLingerDuration = Random.Range(ventLingerTime.x, Mathf.Max(ventLingerTime.x, ventLingerTime.y));
+
+        agent.speed = investigateSpeed;
+        agent.isStopped = false;
+        SetChasing(false);
+        StopChaseAudio(fadeOut: true);
+
+        Vector3 dest = ventFrontPoint;
+        if (NavMesh.SamplePosition(ventFrontPoint, out NavMeshHit hit, 2f, NavMesh.AllAreas)) dest = hit.position;
+        agent.SetDestination(dest);
+    }
+
+    /// <summary>Called as soon as the player starts crawling back out of the vent.</summary>
+    public void OnPlayerLeftVent()
+    {
+        playerHiddenInVent = false;
+    }
+
+    void UpdateVentWait(bool canSee)
+    {
+        // Player came out while he is still standing guard: he spots them again
+        if (canSee && !playerHiddenInVent)
+        {
+            StartChasing();
+            return;
+        }
+
+        if (!ventArrived)
+        {
+            ventApproachTimer += Time.deltaTime;
+            bool close = !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.4f;
+            if (close || ventApproachTimer > 12f)
+            {
+                ventArrived = true;
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+                ventLingerTimer = 0f;
+            }
+            return;
+        }
+
+        agent.isStopped = true;
+        agent.velocity = Vector3.zero;
+        ventLingerTimer += Time.deltaTime;
+
+        // Stare at the grille, with a slow, unsettling sway as if listening
+        Vector3 look = ventLookPoint - transform.position;
+        look.y = 0f;
+        if (look.sqrMagnitude > 0.01f)
+        {
+            float sway = Mathf.Sin(ventLingerTimer * 1.7f) * 14f;
+            Quaternion target = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, sway, 0f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, target, Time.deltaTime * 4f);
+        }
+
+        if (ventLingerTimer >= ventLingerDuration)
+        {
+            // Gives up: forgets the player and goes back to patrolling
+            currentState = State.Wander;
+            agent.isStopped = false;
+            agent.speed = wanderSpeed;
+            waitTimer = 0f;
+            lostTimer = 0f;
+            SetChasing(false);
+            GoToRandomPoint();
         }
     }
 
@@ -531,6 +657,7 @@ public class VillainAI : MonoBehaviour
     void OnNoiseHeard(Vector3 noiseOrigin, float radius)
     {
         if (!canHear || player == null) return;
+        if (playerHiddenInVent) return;
         if (agent == null || !agent.isOnNavMesh) return;
 
         float dist = Vector3.Distance(transform.position, noiseOrigin);
@@ -560,7 +687,7 @@ public class VillainAI : MonoBehaviour
 
     bool CanSeePlayer()
     {
-        if (player == null || reviveGraceTimer > 0f) return false;
+        if (player == null || reviveGraceTimer > 0f || playerHiddenInVent) return false;
 
         if (cachedFlashlight == null)
             cachedFlashlight = player.GetComponentInChildren<Flashlight>();
@@ -601,6 +728,24 @@ public class VillainAI : MonoBehaviour
     {
         if (agent == null || !agent.isOnNavMesh) return;
 
+        // Forward-biased patrol: look ahead down corridors (prevents pacing backward and forward aimlessly)
+        for (int i = 0; i < 5; i++)
+        {
+            Vector3 forwardBias = transform.forward * wanderRadius * Random.Range(0.6f, 1.0f);
+            Vector3 lateralBias = transform.right * Random.Range(-wanderRadius * 0.35f, wanderRadius * 0.35f);
+            Vector3 target = transform.position + forwardBias + lateralBias;
+
+            if (NavMesh.SamplePosition(target, out NavMeshHit hit, wanderRadius * 0.5f, NavMesh.AllAreas))
+            {
+                if (Vector3.Dot(transform.forward, (hit.position - transform.position).normalized) > 0.2f)
+                {
+                    agent.SetDestination(hit.position);
+                    return;
+                }
+            }
+        }
+
+        // Fallback if at a corner/dead-end
         Vector3 random = transform.position + Random.insideUnitSphere * wanderRadius;
         if (NavMesh.SamplePosition(random, out NavMeshHit navHit, wanderRadius, NavMesh.AllAreas))
         {
@@ -638,6 +783,7 @@ public class VillainAI : MonoBehaviour
         {
             case State.Chase: return chaseSpeed;
             case State.Investigate: return investigateSpeed;
+            case State.VentWait: return investigateSpeed;
             default: return wanderSpeed;
         }
     }
@@ -787,6 +933,7 @@ public class VillainAI : MonoBehaviour
         }
 
         if (currentState == State.Wander && !CanSeePlayer()) return;
+        if (playerHiddenInVent) return;   // he must not "know" where the hidden player is
 
         // When hunting, investigating, or chasing, head tracks the player
         Vector3 targetPoint = player.position + Vector3.up * 1.4f;
@@ -839,7 +986,7 @@ public class VillainAI : MonoBehaviour
 
     void OnCaughtPlayer()
     {
-        if (hasCaught) return;
+        if (hasCaught || playerHiddenInVent || PlayerVentController.IsInVent) return;
         hasCaught = true;
         StopChaseAudio(fadeOut: false);
 

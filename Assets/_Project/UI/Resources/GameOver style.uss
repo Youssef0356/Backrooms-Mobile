@@ -34,34 +34,6 @@
     text-shadow: 0 0 0 rgba(0, 0, 0, 0);
 }
 
-/* ============================== full-screen bloody layers ================= */
-
-.gameover-blood-overlay {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    -unity-background-scale-mode: stretch-to-fill;
-    opacity: 0;
-    transition-property: opacity;
-    transition-duration: 0.25s;
-    transition-timing-function: ease-out;
-}
-
-.gameover-pain-flash {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(220, 20, 20, 0.75);
-    opacity: 0;
-    transition-property: opacity;
-    transition-duration: 0.15s;
-    transition-timing-function: ease-out;
-}
-
 /* ============================== full-screen backdrop ===================== */
 
 .gameover-backdrop {

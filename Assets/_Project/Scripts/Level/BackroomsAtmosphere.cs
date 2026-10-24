@@ -16,14 +16,14 @@ public class BackroomsAtmosphere : MonoBehaviour
     [Header("Haze")]
     [Tooltip("Dark distance fog. This makes corridors fade into eerie pitch-black shadows.")]
     [SerializeField] bool enableFog = true;
-    [SerializeField] Color fogColor = new Color(0.035f, 0.030f, 0.022f);
-    [SerializeField] float fogStartDistance = 4f;
-    [SerializeField] float fogEndDistance = 22f;
+    [SerializeField] Color fogColor = new Color(0.010f, 0.008f, 0.006f);
+    [SerializeField] float fogStartDistance = 3f;
+    [SerializeField] float fogEndDistance = 16f;
 
     [Header("Ambient")]
     [Tooltip("Replaces the blue-ish skybox ambient with a dim warm base, so the ceiling panels do the actual lighting.")]
     [SerializeField] bool overrideAmbient = true;
-    [SerializeField] Color ambientColor = new Color(0.040f, 0.035f, 0.025f);
+    [SerializeField] Color ambientColor = new Color(0.015f, 0.012f, 0.008f);
 
     [Header("Camera")]
     [Tooltip("URP post-processing is off on the level camera. Turning it on is what makes the grading / grain / bloom visible.")]
@@ -31,8 +31,8 @@ public class BackroomsAtmosphere : MonoBehaviour
     [SerializeField] bool enableAntiAliasing = true;
 
     [Header("Grade")]
-    [SerializeField] float postExposure = -0.40f;
-    [SerializeField] float contrast = 18f;
+    [SerializeField] float postExposure = -0.95f;
+    [SerializeField] float contrast = 22f;
     [SerializeField] float saturation = -14f;
     [SerializeField] Color colourFilter = new Color(1f, 0.95f, 0.82f);
     [SerializeField] float temperature = 10f;
@@ -42,7 +42,7 @@ public class BackroomsAtmosphere : MonoBehaviour
     [SerializeField] float bloomIntensity = 0.5f;
     [SerializeField] float bloomThreshold = 0.95f;
     [SerializeField] Color bloomTint = new Color(1f, 0.94f, 0.72f);
-    [SerializeField] float vignetteIntensity = 0.45f;
+    [SerializeField] float vignetteIntensity = 0.55f;
     [SerializeField] float grainIntensity = 0.30f;
     [SerializeField] float chromaticAberration = 0.05f;
 
@@ -51,16 +51,23 @@ public class BackroomsAtmosphere : MonoBehaviour
     void OnEnable()
     {
         GameSettings.OnQualityChanged += HandleQualityChanged;
+        GameSettings.OnBrightnessChanged += HandleBrightnessChanged;
     }
 
     void OnDisable()
     {
         GameSettings.OnQualityChanged -= HandleQualityChanged;
+        GameSettings.OnBrightnessChanged -= HandleBrightnessChanged;
     }
 
     void HandleQualityChanged(int q)
     {
         ApplyQualitySettings(q);
+    }
+
+    void HandleBrightnessChanged(float b)
+    {
+        ApplyBrightnessSettings(b);
     }
 
     void Awake()
@@ -173,7 +180,26 @@ public class BackroomsAtmosphere : MonoBehaviour
         volume.weight = 1f;
         volume.profile = profile;
 
+        ApplyBrightnessSettings(GameSettings.Brightness);
         ApplyQualitySettings(GameSettings.QualityLevel);
+    }
+
+    public void ApplyBrightnessSettings(float b)
+    {
+        if (volume != null && volume.profile != null)
+        {
+            if (volume.profile.TryGet<ColorAdjustments>(out ColorAdjustments color))
+            {
+                float brightnessOffset = (b - 0.5f) * 2.5f;
+                color.postExposure.Override(postExposure + brightnessOffset);
+            }
+        }
+
+        if (overrideAmbient)
+        {
+            float ambientMultiplier = Mathf.Lerp(0.35f, 2.4f, b);
+            RenderSettings.ambientLight = ambientColor * ambientMultiplier;
+        }
     }
 
     /// <summary>

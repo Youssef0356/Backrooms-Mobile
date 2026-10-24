@@ -49,6 +49,7 @@ public class PauseMenuController : MonoBehaviour
     [Header("Settings rows (live)")]
     [SerializeField] bool showSoundSlider = true;
     [SerializeField] bool showMusicSlider = true;
+    [SerializeField] bool showBrightnessSlider = true;
     [SerializeField] bool showSensitivitySlider = true;
     [SerializeField] bool showGraphicsOption = true;
     [SerializeField] bool showFrameRateOption = true;
@@ -481,6 +482,10 @@ public class PauseMenuController : MonoBehaviour
             card.Add(BuildSettingRow("MUSIC", GameSettings.MusicVolume, out _, out _,
                 ApplyMusicVolume));
 
+        if (showBrightnessSlider)
+            card.Add(BuildSettingRow("BRIGHTNESS", GameSettings.Brightness, out _, out _,
+                v => GameSettings.SetBrightness(v)));
+
         if (showSensitivitySlider)
             card.Add(BuildSettingRow("LOOK SENSITIVITY", GameSettings.Sensitivity, out _, out _,
                 v => GameSettings.SetSensitivity(v),
@@ -649,7 +654,7 @@ public class PauseMenuController : MonoBehaviour
         controlsCard.AddToClassList("is-hidden");
 
         controlsCard.Add(MakeLabel("CONTROLS", "pause-heading"));
-        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
+        bool isMobile = PlatformUtils.IsMobile;
         controlsCard.Add(MakeLabel(isMobile ? "MOBILE TOUCH CONTROLS" : "KEYBOARD & MOUSE", "pause-subheading"));
         controlsCard.Add(MakeDivider());
 
@@ -756,7 +761,7 @@ public class PauseMenuController : MonoBehaviour
         secControls.AddToClassList("is-hidden");
         scroll.Add(secControls);
 
-        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
+        bool isMobile = PlatformUtils.IsMobile;
 
         secControls.Add(MakeGuideBox(
             isMobile ? "MOBILE TOUCH CONTROLS" : "KEYBOARD & MOUSE CONTROLS",

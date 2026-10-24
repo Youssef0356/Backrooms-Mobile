@@ -59,6 +59,7 @@ public class MainMenuController : MonoBehaviour
     Button tabTouch;
     Button tabKeyboard;
 
+    VisualElement controlsTabs;
     VisualElement settingsPanel;
     VisualElement controlsPanel;
     VisualElement touchContainer;
@@ -107,6 +108,7 @@ public class MainMenuController : MonoBehaviour
         controlsCloseButton = root.Q<Button>("controls-close-button");
         tabTouch = root.Q<Button>("tab-touch");
         tabKeyboard = root.Q<Button>("tab-keyboard");
+        controlsTabs = root.Q<VisualElement>("controls-tabs");
 
         settingsPanel = root.Q<VisualElement>("settings-panel");
         controlsPanel = root.Q<VisualElement>("controls-panel");
@@ -193,11 +195,26 @@ public class MainMenuController : MonoBehaviour
         if (tabTouch != null) tabTouch.clicked += () => SwitchControlsTab(touchMode: true);
         if (tabKeyboard != null) tabKeyboard.clicked += () => SwitchControlsTab(touchMode: false);
 
-        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
-        SwitchControlsTab(touchMode: isMobile);
+        bool isMobile = PlatformUtils.IsMobile;
+        if (isMobile)
+        {
+            if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.Flex;
+            if (tabTouch != null) tabTouch.style.display = DisplayStyle.Flex;
+            SwitchControlsTab(touchMode: true);
 
-        if (hintLabel != null && isMobile)
-            hintLabel.text = "TAP A CHOICE TO SELECT";
+            if (hintLabel != null)
+                hintLabel.text = "TAP A CHOICE TO SELECT";
+        }
+        else
+        {
+            // On PC / Desktop: hide touch tab and controls tabs bar so only PC keyboard/mouse controls show
+            if (tabTouch != null) tabTouch.style.display = DisplayStyle.None;
+            if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.None;
+            SwitchControlsTab(touchMode: false);
+
+            if (hintLabel != null)
+                hintLabel.text = "PRESS ENTER OR CLICK TO SELECT";
+        }
     }
 
     void SwitchControlsTab(bool touchMode)
@@ -489,6 +506,15 @@ public class MainMenuController : MonoBehaviour
     {
         settingsPanel?.AddToClassList("is-hidden");
         controlsPanel?.RemoveFromClassList("is-hidden");
+
+        bool isMobile = PlatformUtils.IsMobile;
+        if (!isMobile)
+        {
+            if (tabTouch != null) tabTouch.style.display = DisplayStyle.None;
+            if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.None;
+            SwitchControlsTab(touchMode: false);
+        }
+
         controlsCloseButton?.Focus();
     }
 

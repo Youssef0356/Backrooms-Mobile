@@ -62,7 +62,8 @@ namespace StarterAssets
         {
             m_Document = GetComponent<UIDocument>();
 
-            bool isTouchPlatform = Application.isMobilePlatform || Input.touchSupported || forceShowTouchControls;
+            // Determine if touch controls should be active based on platform or manual test override
+            bool isTouchPlatform = PlatformUtils.IsMobile || forceShowTouchControls;
             if (!isTouchPlatform)
             {
                 if (m_Document != null && m_Document.rootVisualElement != null)

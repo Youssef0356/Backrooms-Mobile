@@ -106,12 +106,12 @@
 
                 <!-- Tabs: Touch Controls / Keyboard & Mouse -->
                 <ui:VisualElement name="controls-tabs" class="controls-tab-bar">
-                    <ui:Button name="tab-touch" class="controls-tab-btn is-tab-active" text="TOUCH" />
-                    <ui:Button name="tab-keyboard" class="controls-tab-btn" text="KEYBOARD" />
+                    <ui:Button name="tab-touch" class="controls-tab-btn" text="TOUCH" />
+                    <ui:Button name="tab-keyboard" class="controls-tab-btn is-tab-active" text="KEYBOARD" />
                 </ui:VisualElement>
 
                 <!-- Touch Controls Container -->
-                <ui:VisualElement name="touch-controls-container" class="controls-container">
+                <ui:VisualElement name="touch-controls-container" class="controls-container is-hidden">
                     <ui:VisualElement class="key-row">
                         <ui:Label class="key" text="LEFT JOYSTICK" />
                         <ui:Label class="key-desc" text="MOVE" />
@@ -135,7 +135,7 @@
                 </ui:VisualElement>
 
                 <!-- Keyboard Controls Container -->
-                <ui:VisualElement name="keyboard-controls-container" class="controls-container is-hidden">
+                <ui:VisualElement name="keyboard-controls-container" class="controls-container">
                     <ui:VisualElement class="key-row">
                         <ui:Label class="key" text="W A S D" />
                         <ui:Label class="key-desc" text="MOVE" />

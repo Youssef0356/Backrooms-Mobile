@@ -44,8 +44,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
     public bool panelLights = true;
     [Tooltip("Upper bound on point lights in the whole level. Panels past this keep their glow but cast no light.")]
     public int maxPanelLights = 24;
-    public float panelLightIntensity = 1.9f;
-    public float panelLightRange = 7.0f;
+    public float panelLightIntensity = 1.15f;
+    public float panelLightRange = 5.5f;
     public Color panelLightColor = new Color(1f, 0.96f, 0.84f);
     [Tooltip("Chance a panel light is a dying fluorescent that randomly stutters.")]
     [Range(0f, 1f)] public float panelFlickerChance = 0.08f;
@@ -76,6 +76,22 @@ public class BackroomsRoomGenerator : MonoBehaviour
     public float wallTextureMeters = 2f;
     public float ceilingTextureMeters = 3f;
 
+    [Header("Wall Decals (Horror Markings)")]
+    [Tooltip("Scatter creepy horror wall markings (claw marks, bloody prints, eerie warnings) across corridor and room walls.")]
+    public bool enableWallDecals = true;
+    [Range(0f, 1f)] public float wallDecalChance = 0.16f;
+    [Range(0f, 1f)] public float deadEndDecalChance = 0.75f;
+    public int maxWallDecals = 45;
+    public Material[] customDecalMaterials;
+
+    [Header("Wall Vents (Hiding Spots)")]
+    [Tooltip("Scatter crawl-in wall vents across corridors and rooms for escaping the entity.")]
+    public bool enableWallVents = true;
+    [Range(0, 30)] public int maxVents = 12;
+    [Range(0f, 1f)] public float ventChance = 0.12f;
+    public Material ventMetalMaterial;
+    public Material ventDuctMaterial;
+
     [Header("Optional prefabs (override the boxes)")]
     public GameObject floorPrefab;
     public GameObject ceilingPrefab;
@@ -94,6 +110,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
     bool[,] floor;
     bool[,] roomCell;
     readonly List<RectInt> rooms = new List<RectInt>();
+    readonly HashSet<long> ventEdges = new HashSet<long>();
+    readonly List<Vector3> tableTopSpots = new List<Vector3>();
     Transform root;
     Vector2Int reservedExitCell = new Vector2Int(-99, -99);
 
@@ -121,11 +139,14 @@ public class BackroomsRoomGenerator : MonoBehaviour
         floor = new bool[gridWidth, gridHeight];
         roomCell = new bool[gridWidth, gridHeight];
         rooms.Clear();
+        tableTopSpots.Clear();
         reservedExitCell = new Vector2Int(-99, -99);
 
         PlaceRooms();
         ConnectRooms();
         CarveBranches();
+        ReserveExitSpot();
+        SelectVentSlots();
         BuildFloorsAndCeilings();
         BuildWalls();
         BuildPillars();
@@ -133,10 +154,9 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
         CombineGeneratedMeshes();
 
-        // Reserve exit spot and its clearance zone before placing props
-        ReserveExitSpot();
-
         BuildDecorations();
+        BuildWallDecals();
+        BuildAlmondWaterPickups();
 
         if (surface != null)
         {
@@ -155,7 +175,15 @@ public class BackroomsRoomGenerator : MonoBehaviour
         EnsureVictorySystem();
         EnsureSurvivalDialogueHUD();
         EnsurePlayerMotion();
+        EnsurePlayerStaminaHUD();
+        EnsurePlayerVentController();
+        EnsureVentHUD();
         EnsureMonsterCompositionAudio();
+        EnsurePlayerSanity();
+        EnsurePlayerInventory();
+        EnsurePlayerDrinkController();
+        EnsureInventoryHUD();
+        EnsureHallucinationManager();
     }
 
     // ---------------- Layout ----------------
@@ -373,7 +401,17 @@ public class BackroomsRoomGenerator : MonoBehaviour
                     Vector3 edge = CellCenter(x, z) + dir * (tileSize / 2f);
                     bool alongX = (dx[d] == 0);
 
-                    if (wallPrefab != null)
+                    long edgeKey = ((long)x << 32) | ((long)z << 16) | (long)d;
+                    bool hasVent = enableWallVents && ventEdges.Contains(edgeKey);
+
+                    if (hasVent)
+                    {
+                        BuildWallWithVentHole(edge, dir, alongX);
+                        Vector3 inward = -dir;
+                        Vector3 innerFacePos = edge + inward * (wallThickness / 2f);
+                        VentHideSpot.Create(root, innerFacePos, dir, wallThickness, 1.25f, ventMetalMaterial, ventDuctMaterial);
+                    }
+                    else if (wallPrefab != null)
                     {
                         float yaw = yaws[d] + (flipWallFacing ? 180f : 0f);
                         Vector3 size = alongX ? new Vector3(tileSize + wallThickness, wallHeight, 0f)
@@ -395,6 +433,167 @@ public class BackroomsRoomGenerator : MonoBehaviour
                             Box("Baseboard", new Vector3(p.x, 0.075f, p.z), bs, baseboardMaterial, false);
                         }
                     }
+                }
+            }
+        }
+    }
+
+    struct VentCandidate
+    {
+        public int x, z, d;
+        public Vector3 worldPos;
+    }
+
+    void SelectVentSlots()
+    {
+        ventEdges.Clear();
+        if (!enableWallVents || maxVents <= 0) return;
+
+        int[] dx = { 0, 0, 1, -1 };
+        int[] dz = { 1, -1, 0, 0 };
+
+        Vector2Int spawnCell = rooms.Count > 0 ? RoomCenter(rooms[0]) : new Vector2Int(-99, -99);
+        List<VentCandidate> candidates = new List<VentCandidate>();
+
+        for (int x = 1; x < gridWidth - 1; x++)
+        {
+            for (int z = 1; z < gridHeight - 1; z++)
+            {
+                if (!floor[x, z]) continue;
+                // Avoid right at player spawn
+                if (Mathf.Abs(spawnCell.x - x) <= 1 && Mathf.Abs(spawnCell.y - z) <= 1) continue;
+                // Avoid exit door area
+                if (reservedExitCell.x >= 0 && Mathf.Abs(reservedExitCell.x - x) <= 2 && Mathf.Abs(reservedExitCell.y - z) <= 2) continue;
+
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = x + dx[d];
+                    int nz = z + dz[d];
+                    if (IsFloor(nx, nz)) continue; // Must be a wall
+
+                    Vector3 dir = new Vector3(dx[d], 0, dz[d]);
+                    Vector3 edge = CellCenter(x, z) + dir * (tileSize / 2f);
+
+                    candidates.Add(new VentCandidate { x = x, z = z, d = d, worldPos = edge });
+                }
+            }
+        }
+
+        if (candidates.Count == 0) return;
+
+        // Shuffle candidates using Fisher-Yates
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            int r = Random.Range(i, candidates.Count);
+            var tmp = candidates[i];
+            candidates[i] = candidates[r];
+            candidates[r] = tmp;
+        }
+
+        List<Vector3> placedPositions = new List<Vector3>();
+        float minSeparationSqr = (tileSize * 3.5f) * (tileSize * 3.5f); // Keep vents well spaced (~8-10m apart)
+
+        foreach (var c in candidates)
+        {
+            if (ventEdges.Count >= maxVents) break;
+            if (Random.value > ventChance && ventEdges.Count >= 3) continue;
+
+            // Check distance to already placed vents
+            bool tooClose = false;
+            for (int p = 0; p < placedPositions.Count; p++)
+            {
+                if ((placedPositions[p] - c.worldPos).sqrMagnitude < minSeparationSqr)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (tooClose) continue;
+
+            long key = ((long)c.x << 32) | ((long)c.z << 16) | (long)c.d;
+            ventEdges.Add(key);
+            placedPositions.Add(c.worldPos);
+        }
+    }
+
+    void BuildWallWithVentHole(Vector3 edge, Vector3 dir, bool alongX)
+    {
+        float L = tileSize + wallThickness;
+        float H = wallHeight;
+        float T = wallThickness;
+        float holeW = VentHideSpot.HoleWidth; // 0.90m
+        float holeBot = VentHideSpot.HoleBottom; // 0.12m
+        float holeTop = VentHideSpot.HoleTop; // 0.87m
+        float holeH = holeTop - holeBot; // 0.75m
+        float sideW = (L - holeW) * 0.5f;
+
+        if (alongX)
+        {
+            // 1. Top wall above hole
+            float topH = H - holeTop;
+            Box("Wall", new Vector3(edge.x, holeTop + topH * 0.5f, edge.z),
+                new Vector3(L, topH, T), wallMaterial, false);
+
+            // 2. Bottom wall under hole
+            Box("Wall", new Vector3(edge.x, holeBot * 0.5f, edge.z),
+                new Vector3(L, holeBot, T), wallMaterial, false);
+
+            // 3. Left side of hole
+            float leftX = edge.x - holeW * 0.5f - sideW * 0.5f;
+            Box("Wall", new Vector3(leftX, holeBot + holeH * 0.5f, edge.z),
+                new Vector3(sideW, holeH, T), wallMaterial, false);
+
+            // 4. Right side of hole
+            float rightX = edge.x + holeW * 0.5f + sideW * 0.5f;
+            Box("Wall", new Vector3(rightX, holeBot + holeH * 0.5f, edge.z),
+                new Vector3(sideW, holeH, T), wallMaterial, false);
+
+            if (baseboardMaterial != null)
+            {
+                Vector3 inward = -dir;
+                Vector3 p = edge + inward * (wallThickness / 2f + 0.02f);
+                float bbSideW = (tileSize - holeW) * 0.5f;
+                if (bbSideW > 0.05f)
+                {
+                    float bbLeftX = p.x - holeW * 0.5f - bbSideW * 0.5f;
+                    float bbRightX = p.x + holeW * 0.5f + bbSideW * 0.5f;
+                    Box("Baseboard", new Vector3(bbLeftX, 0.075f, p.z), new Vector3(bbSideW, 0.15f, 0.04f), baseboardMaterial, false);
+                    Box("Baseboard", new Vector3(bbRightX, 0.075f, p.z), new Vector3(bbSideW, 0.15f, 0.04f), baseboardMaterial, false);
+                }
+            }
+        }
+        else
+        {
+            // 1. Top wall above hole
+            float topH = H - holeTop;
+            Box("Wall", new Vector3(edge.x, holeTop + topH * 0.5f, edge.z),
+                new Vector3(T, topH, L), wallMaterial, false);
+
+            // 2. Bottom wall under hole
+            Box("Wall", new Vector3(edge.x, holeBot * 0.5f, edge.z),
+                new Vector3(T, holeBot, L), wallMaterial, false);
+
+            // 3. Left/back side of hole along Z
+            float leftZ = edge.z - holeW * 0.5f - sideW * 0.5f;
+            Box("Wall", new Vector3(edge.x, holeBot + holeH * 0.5f, leftZ),
+                new Vector3(T, holeH, sideW), wallMaterial, false);
+
+            // 4. Right/forward side of hole along Z
+            float rightZ = edge.z + holeW * 0.5f + sideW * 0.5f;
+            Box("Wall", new Vector3(edge.x, holeBot + holeH * 0.5f, rightZ),
+                new Vector3(T, holeH, sideW), wallMaterial, false);
+
+            if (baseboardMaterial != null)
+            {
+                Vector3 inward = -dir;
+                Vector3 p = edge + inward * (wallThickness / 2f + 0.02f);
+                float bbSideW = (tileSize - holeW) * 0.5f;
+                if (bbSideW > 0.05f)
+                {
+                    float bbLeftZ = p.z - holeW * 0.5f - bbSideW * 0.5f;
+                    float bbRightZ = p.z + holeW * 0.5f + bbSideW * 0.5f;
+                    Box("Baseboard", new Vector3(p.x, 0.075f, bbLeftZ), new Vector3(0.04f, 0.15f, bbSideW), baseboardMaterial, false);
+                    Box("Baseboard", new Vector3(p.x, 0.075f, bbRightZ), new Vector3(0.04f, 0.15f, bbSideW), baseboardMaterial, false);
                 }
             }
         }
@@ -648,6 +847,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
         else if (!weird)
         {
             PlaceOnFloor(wrapper, center, dir, 0f);
+            string lower = prefab.name.ToLowerInvariant();
+            if (lower.Contains("table") || lower.Contains("desk"))
+            {
+                Bounds wb = GetBounds(wrapper);
+                tableTopSpots.Add(new Vector3(wb.center.x, wb.max.y + 0.02f, wb.center.z));
+            }
         }
         else
         {
@@ -925,6 +1130,183 @@ public class BackroomsRoomGenerator : MonoBehaviour
         );
     }
 
+    // ---------------- Wall Decals (Horror Markings) ----------------
+
+    struct WallDecalSlot
+    {
+        public int x;
+        public int z;
+        public int d;
+        public bool isDeadEnd;
+    }
+
+    Material[] GetDecalMaterials()
+    {
+        if (customDecalMaterials != null && customDecalMaterials.Length > 0)
+        {
+            List<Material> valid = new List<Material>();
+            for (int i = 0; i < customDecalMaterials.Length; i++)
+            {
+                if (customDecalMaterials[i] != null) valid.Add(customDecalMaterials[i]);
+            }
+            if (valid.Count > 0) return valid.ToArray();
+        }
+
+        Material[] loaded = Resources.LoadAll<Material>("Decals");
+        if (loaded != null && loaded.Length > 0)
+            return loaded;
+
+        return null;
+    }
+
+    void BuildWallDecals()
+    {
+        if (!enableWallDecals || maxWallDecals <= 0) return;
+
+        Material[] decalMats = GetDecalMaterials();
+        if (decalMats == null || decalMats.Length == 0) return;
+
+        int[] dx = { 0, 0, 1, -1 };
+        int[] dz = { 1, -1, 0, 0 };
+
+        List<WallDecalSlot> slots = new List<WallDecalSlot>();
+
+        for (int x = 1; x < gridWidth - 1; x++)
+        {
+            for (int z = 1; z < gridHeight - 1; z++)
+            {
+                if (!floor[x, z]) continue;
+
+                // Check dead-end status (1 or fewer walkable floor neighbors)
+                int floorNeighbors = 0;
+                for (int d = 0; d < 4; d++)
+                {
+                    if (IsFloor(x + dx[d], z + dz[d])) floorNeighbors++;
+                }
+                bool isDeadEnd = (floorNeighbors <= 1);
+
+                for (int d = 0; d < 4; d++)
+                {
+                    if (IsFloor(x + dx[d], z + dz[d])) continue;
+
+                    // Exclude exit door cell wall so the exit remains unobscured
+                    if (x == reservedExitCell.x && z == reservedExitCell.y) continue;
+
+                    slots.Add(new WallDecalSlot { x = x, z = z, d = d, isDeadEnd = isDeadEnd });
+                }
+            }
+        }
+
+        if (slots.Count == 0) return;
+
+        // Shuffle slots using Fisher-Yates
+        for (int i = 0; i < slots.Count; i++)
+        {
+            int r = Random.Range(i, slots.Count);
+            WallDecalSlot temp = slots[i];
+            slots[i] = slots[r];
+            slots[r] = temp;
+        }
+
+        // Shuffle materials to ensure varied distribution
+        List<Material> matPool = new List<Material>(decalMats);
+        for (int i = 0; i < matPool.Count; i++)
+        {
+            int r = Random.Range(i, matPool.Count);
+            Material temp = matPool[i];
+            matPool[i] = matPool[r];
+            matPool[r] = temp;
+        }
+
+        GameObject decalsParent = new GameObject("WallDecals");
+        decalsParent.transform.SetParent(root, false);
+        IgnoreForNavMesh(decalsParent);
+
+        int decalsPlaced = 0;
+        int matIndex = 0;
+
+        foreach (WallDecalSlot slot in slots)
+        {
+            if (decalsPlaced >= maxWallDecals) break;
+
+            long edgeKey = ((long)slot.x << 32) | ((long)slot.z << 16) | (long)slot.d;
+            if (ventEdges.Contains(edgeKey)) continue;
+
+            float chance = slot.isDeadEnd ? deadEndDecalChance : wallDecalChance;
+            if (Random.value > chance) continue;
+
+            Vector3 dir = new Vector3(dx[slot.d], 0, dz[slot.d]);
+            Vector3 inward = -dir;
+            Vector3 edge = CellCenter(slot.x, slot.z) + dir * (tileSize / 2f);
+
+            // Position flush on inner face (+0.006m into room to prevent z-fighting with the wall)
+            Vector3 decalPos = edge + inward * (wallThickness / 2f + 0.006f);
+
+            // Realistic chest / eye level placement (1.25m to 1.75m)
+            decalPos.y = Random.Range(1.25f, 1.75f);
+
+            // Lateral offset along the wall plane
+            Vector3 lateral = Vector3.Cross(Vector3.up, inward);
+            float maxOffset = (tileSize * 0.5f) - 0.45f;
+            if (maxOffset > 0.05f)
+            {
+                decalPos += lateral * Random.Range(-maxOffset, maxOffset);
+            }
+
+            Material chosenMat = matPool[matIndex % matPool.Count];
+            matIndex++;
+
+            GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            quad.name = $"Decal_{chosenMat.name}_{decalsPlaced}";
+            quad.transform.SetParent(decalsParent.transform, false);
+            quad.transform.position = decalPos;
+
+            // In Unity Quad, normal is -Vector3.forward. Setting forward = dir makes -forward = inward (faces into room)
+            quad.transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
+
+            // Eerie subtle hand-painted angle tilt
+            quad.transform.Rotate(0f, 0f, Random.Range(-4.5f, 4.5f), Space.Self);
+
+            // Compute aspect ratio dynamically from material's texture
+            float aspect = 1f;
+            Texture mainTex = chosenMat.mainTexture != null ? chosenMat.mainTexture : (chosenMat.HasProperty("_BaseMap") ? chosenMat.GetTexture("_BaseMap") : null);
+            if (mainTex != null && mainTex.height > 0)
+            {
+                aspect = (float)mainTex.width / mainTex.height;
+            }
+            else if (chosenMat.name.Contains("dont_look_back") || chosenMat.name.Contains("no_exit") ||
+                     chosenMat.name.Contains("it_sees_you") || chosenMat.name.Contains("run") ||
+                     chosenMat.name.Contains("help_us"))
+            {
+                aspect = 2f;
+            }
+
+            float baseHeight = Random.Range(0.85f, 1.25f);
+            float baseWidth = baseHeight * aspect;
+            quad.transform.localScale = new Vector3(baseWidth, baseHeight, 1f);
+
+            // Remove default collider
+            Collider col = quad.GetComponent<Collider>();
+            if (col != null)
+            {
+                if (Application.isPlaying) Destroy(col);
+                else DestroyImmediate(col);
+            }
+
+            MeshRenderer mr = quad.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = chosenMat;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = true;
+            mr.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            mr.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+
+            quad.isStatic = true;
+            IgnoreForNavMesh(quad);
+
+            decalsPlaced++;
+        }
+    }
+
     // ---------------- Helpers ----------------
 
     void CombineGeneratedMeshes()
@@ -1034,8 +1416,9 @@ public class BackroomsRoomGenerator : MonoBehaviour
         g.transform.localScale = scale;
         g.isStatic = true;
 
-        // Discard redundant physics colliders on non-walkable / purely visual ceilings, baseboards, and lights
-        if (name == "Ceiling" || name == "Baseboard" || name == "LightPanel")
+        // Discard redundant physics colliders on non-walkable / purely visual baseboards and lights
+        // NOTE: Ceilings KEEP their colliders so the player cannot jump through into the void!
+        if (name == "Baseboard" || name == "LightPanel")
         {
             Collider col = g.GetComponent<Collider>();
             if (col != null) Destroy(col);
@@ -1445,6 +1828,32 @@ public class BackroomsRoomGenerator : MonoBehaviour
         }
     }
 
+    void EnsurePlayerStaminaHUD()
+    {
+        if (FindAnyObjectByType<PlayerStaminaHUD>() != null) return;
+        new GameObject("Player Stamina HUD").AddComponent<PlayerStaminaHUD>();
+    }
+
+    void EnsurePlayerVentController()
+    {
+        Transform targetPlayer = player;
+        if (targetPlayer == null)
+        {
+            var fpc = FindAnyObjectByType<StarterAssets.FirstPersonController>();
+            if (fpc != null) targetPlayer = fpc.transform;
+        }
+
+        if (targetPlayer != null && targetPlayer.GetComponent<PlayerVentController>() == null)
+        {
+            targetPlayer.gameObject.AddComponent<PlayerVentController>();
+        }
+    }
+
+    void EnsureVentHUD()
+    {
+        VentHUD.GetOrCreate();
+    }
+
     void EnsureMonsterCompositionAudio()
     {
         MonsterCompositionAudio compAudio = FindAnyObjectByType<MonsterCompositionAudio>();
@@ -1476,5 +1885,122 @@ public class BackroomsRoomGenerator : MonoBehaviour
         }
 
         compAudio.InitializeSpots(candidateSpots);
+    }
+
+    // ---------------- Almond Water & Mental Systems ----------------
+
+    void BuildAlmondWaterPickups()
+    {
+        Transform pickupRoot = new GameObject("AlmondWaterPickups").transform;
+        pickupRoot.SetParent(root, false);
+
+        int spawnedCount = 0;
+        int maxBottles = 10;
+
+        // 1. Spawn on valid table / desk surfaces
+        for (int i = 0; i < tableTopSpots.Count && spawnedCount < 5; i++)
+        {
+            if (Random.value < 0.85f)
+            {
+                SpawnAlmondWaterBottle(pickupRoot, tableTopSpots[i]);
+                spawnedCount++;
+            }
+        }
+
+        // 2. Spawn in room corners or alcoves across the map
+        Vector2Int spawnCell = rooms.Count > 0 ? RoomCenter(rooms[0]) : new Vector2Int(-99, -99);
+        List<Vector2Int> validCells = new List<Vector2Int>();
+
+        for (int x = 2; x < gridWidth - 2; x++)
+        {
+            for (int z = 2; z < gridHeight - 2; z++)
+            {
+                if (!floor[x, z]) continue;
+                if (Mathf.Abs(spawnCell.x - x) <= 2 && Mathf.Abs(spawnCell.y - z) <= 2) continue;
+                if (reservedExitCell.x >= 0 && Mathf.Abs(reservedExitCell.x - x) <= 2 && Mathf.Abs(reservedExitCell.y - z) <= 2) continue;
+                validCells.Add(new Vector2Int(x, z));
+            }
+        }
+
+        for (int i = 0; i < validCells.Count; i++)
+        {
+            int j = Random.Range(i, validCells.Count);
+            Vector2Int tmp = validCells[i];
+            validCells[i] = validCells[j];
+            validCells[j] = tmp;
+        }
+
+        for (int i = 0; i < validCells.Count && spawnedCount < maxBottles; i++)
+        {
+            Vector2Int c = validCells[i];
+            Vector3 center = CellCenter(c.x, c.y);
+            Vector3 bottlePos = center + new Vector3(Random.Range(-0.85f, 0.85f), 0.05f, Random.Range(-0.85f, 0.85f));
+            SpawnAlmondWaterBottle(pickupRoot, bottlePos);
+            spawnedCount++;
+        }
+    }
+
+    void SpawnAlmondWaterBottle(Transform parent, Vector3 position)
+    {
+        GameObject bottle = new GameObject("AlmondWater_Bottle");
+        bottle.transform.SetParent(parent, false);
+        bottle.transform.position = position;
+        bottle.AddComponent<AlmondWaterPickup>();
+    }
+
+    void EnsurePlayerSanity()
+    {
+        Transform targetPlayer = player;
+        if (targetPlayer == null)
+        {
+            var fpc = FindAnyObjectByType<StarterAssets.FirstPersonController>();
+            if (fpc != null) targetPlayer = fpc.transform;
+        }
+
+        if (targetPlayer != null && targetPlayer.GetComponent<PlayerSanity>() == null)
+        {
+            targetPlayer.gameObject.AddComponent<PlayerSanity>();
+        }
+    }
+
+    void EnsurePlayerInventory()
+    {
+        Transform targetPlayer = player;
+        if (targetPlayer == null)
+        {
+            var fpc = FindAnyObjectByType<StarterAssets.FirstPersonController>();
+            if (fpc != null) targetPlayer = fpc.transform;
+        }
+
+        if (targetPlayer != null && targetPlayer.GetComponent<PlayerInventory>() == null)
+        {
+            targetPlayer.gameObject.AddComponent<PlayerInventory>();
+        }
+    }
+
+    void EnsurePlayerDrinkController()
+    {
+        Transform targetPlayer = player;
+        if (targetPlayer == null)
+        {
+            var fpc = FindAnyObjectByType<StarterAssets.FirstPersonController>();
+            if (fpc != null) targetPlayer = fpc.transform;
+        }
+
+        if (targetPlayer != null && targetPlayer.GetComponent<PlayerDrinkController>() == null)
+        {
+            targetPlayer.gameObject.AddComponent<PlayerDrinkController>();
+        }
+    }
+
+    void EnsureInventoryHUD()
+    {
+        InventoryHUD.GetOrCreate();
+    }
+
+    void EnsureHallucinationManager()
+    {
+        if (FindAnyObjectByType<HallucinationManager>() != null) return;
+        new GameObject("Hallucination Manager").AddComponent<HallucinationManager>();
     }
 }

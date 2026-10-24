@@ -22,22 +22,36 @@ public class PlayerNoiseEmitter : MonoBehaviour
 
     CharacterController controller;
     StarterAssetsInputs inputs;
+    FirstPersonController fpc;
     float stepTimer;
 
     void Awake()
     {
         controller = GetComponent<CharacterController>();
         inputs = GetComponent<StarterAssetsInputs>();
+        fpc = GetComponent<FirstPersonController>();
     }
 
     void Update()
     {
         if (GameOverController.IsGameOver || PauseMenuController.IsPaused) return;
 
+        // Hiding in a vent: the player is crouched silent, no footstep noise
+        if (PlayerVentController.IsInVent)
+        {
+            stepTimer = 0f;
+            return;
+        }
+
         bool isMoving = false;
         bool isSprinting = false;
 
-        if (inputs != null)
+        if (fpc != null)
+        {
+            isMoving = inputs != null ? inputs.move != Vector2.zero : (controller != null && controller.velocity.magnitude > 0.5f);
+            isSprinting = fpc.IsSprinting;
+        }
+        else if (inputs != null)
         {
             isMoving = inputs.move != Vector2.zero;
             isSprinting = inputs.sprint && isMoving;

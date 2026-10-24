@@ -64,9 +64,6 @@ public class GameOverController : MonoBehaviour
     VisualElement root;
     VisualElement backdrop;
     VisualElement card;
-    VisualElement bloodOverlay;
-    VisualElement painFlashOverlay;
-    Texture2D bloodTexture;
     Label recBadge;
     Label timeStatLabel;
     Button reviveButton;
@@ -105,7 +102,6 @@ public class GameOverController : MonoBehaviour
 
         StopAllCoroutines();
         if (audioSource != null) audioSource.Stop();
-        if (bloodTexture != null) Destroy(bloodTexture);
 
         RestoreCursor();
     }
@@ -274,32 +270,12 @@ public class GameOverController : MonoBehaviour
                     {
                         impactTriggered = true;
 
-                        // Trigger red pain flash & reveal bloody overlay on the lens
-                        if (painFlashOverlay != null)
-                        {
-                            painFlashOverlay.style.display = DisplayStyle.Flex;
-                            painFlashOverlay.style.opacity = 1f;
-                        }
-                        if (bloodOverlay != null)
-                        {
-                            bloodOverlay.style.display = DisplayStyle.Flex;
-                            bloodOverlay.style.opacity = 1f;
-                        }
-
                         // Play impact thud
                         AudioClip landClip = Resources.Load<AudioClip>("SFX/Footsteps/Player_Land");
                         if (landClip != null && audioSource != null)
                         {
                             audioSource.PlayOneShot(landClip, 1.0f);
                         }
-                    }
-
-                    // Fade out pain flash quickly (leaves the bloody vignette and spatters behind)
-                    if (painFlashOverlay != null)
-                    {
-                        float flashFade = Mathf.Clamp01((timer - impactTime) / 0.35f);
-                        painFlashOverlay.style.opacity = 1f - flashFade;
-                        if (flashFade >= 1f) painFlashOverlay.style.display = DisplayStyle.None;
                     }
 
                     float timeSinceImpact = timer - impactTime;
@@ -376,7 +352,7 @@ public class GameOverController : MonoBehaviour
 
         if (reviveButton != null)
         {
-            bool canRevive = AdManager.Instance == null || AdManager.Instance.CanShowRevive;
+            bool canRevive = PlatformUtils.IsMobile && (AdManager.Instance == null || AdManager.Instance.CanShowRevive);
             reviveButton.style.display = canRevive ? DisplayStyle.Flex : DisplayStyle.None;
             reviveButton.SetEnabled(true);
             reviveButton.text = "▶ RECOVER SIGNAL (REVIVE)";
@@ -402,11 +378,9 @@ public class GameOverController : MonoBehaviour
         while (IsGameOver && recBadge != null)
         {
             recBadge.style.opacity = 1f;
-            if (bloodOverlay != null) bloodOverlay.style.opacity = 1f;
             yield return new WaitForSecondsRealtime(0.6f);
             if (!IsGameOver) break;
             recBadge.style.opacity = 0.15f;
-            if (bloodOverlay != null) bloodOverlay.style.opacity = 0.82f;
             yield return new WaitForSecondsRealtime(0.4f);
         }
     }
@@ -450,8 +424,6 @@ public class GameOverController : MonoBehaviour
             backdrop.style.display = DisplayStyle.None;
             backdrop.RemoveFromClassList("is-visible");
         }
-        if (painFlashOverlay != null) painFlashOverlay.style.display = DisplayStyle.None;
-        if (bloodOverlay != null) bloodOverlay.style.display = DisplayStyle.None;
 
         RestoreCursor();
 
@@ -474,6 +446,8 @@ public class GameOverController : MonoBehaviour
             FirstPersonController fpc = player.GetComponent<FirstPersonController>();
             if (fpc != null) fpc.enabled = true;
 
+            PlayerStamina.Instance?.ResetStamina();
+
             StarterAssetsInputs inputs = player.GetComponent<StarterAssetsInputs>();
             if (inputs != null)
             {
@@ -485,7 +459,7 @@ public class GameOverController : MonoBehaviour
         }
 
         // 4. Restore touch controls (if on touch platform)
-        bool isTouch = Application.isMobilePlatform || Input.touchSupported;
+        bool isTouch = PlatformUtils.IsMobile;
         if (isTouch)
         {
             TouchscreenInput touchUI = FindAnyObjectByType<TouchscreenInput>(FindObjectsInactive.Include);
@@ -669,23 +643,6 @@ public class GameOverController : MonoBehaviour
         if (sheet != null) root.styleSheets.Add(sheet);
         else Debug.LogWarning("GameOverController: stylesheet not found at " + styleResourcePath, this);
 
-        // Bloody Vignette & Splatters Layer
-        bloodOverlay = new VisualElement();
-        bloodOverlay.AddToClassList("gameover-blood-overlay");
-        bloodOverlay.style.display = DisplayStyle.None;
-        bloodTexture = CreateBloodyVignetteTexture(512, 512);
-        if (bloodTexture != null)
-        {
-            bloodOverlay.style.backgroundImage = new StyleBackground(bloodTexture);
-        }
-        root.Add(bloodOverlay);
-
-        // Pain Flash Layer (flashes bright red upon lethal strike)
-        painFlashOverlay = new VisualElement();
-        painFlashOverlay.AddToClassList("gameover-pain-flash");
-        painFlashOverlay.style.display = DisplayStyle.None;
-        root.Add(painFlashOverlay);
-
         // Backdrop
         backdrop = new VisualElement();
         backdrop.AddToClassList("gameover-backdrop");
@@ -738,148 +695,18 @@ public class GameOverController : MonoBehaviour
         statsBox.Add(timeRow);
 
         // Buttons
-        reviveButton = MakeButton("▶ RECOVER SIGNAL (REVIVE)", OnReviveClicked);
-        reviveButton.AddToClassList("gameover-button--revive");
-        card.Add(reviveButton);
+        if (PlatformUtils.IsMobile)
+        {
+            reviveButton = MakeButton("▶ RECOVER SIGNAL (REVIVE)", OnReviveClicked);
+            reviveButton.AddToClassList("gameover-button--revive");
+            card.Add(reviveButton);
+        }
 
         retryButton = MakeButton(retryButtonLabel, OnRetryClicked);
         card.Add(retryButton);
 
         menuButton = MakeButton(menuButtonLabel, OnMenuClicked, secondary: true);
         card.Add(menuButton);
-    }
-
-    Texture2D CreateBloodyVignetteTexture(int width, int height)
-    {
-        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-        tex.name = "ProceduralBloodVignette";
-        tex.wrapMode = TextureWrapMode.Clamp;
-        tex.filterMode = FilterMode.Bilinear;
-
-        Color32[] pixels = new Color32[width * height];
-        Color32 deepCrimson = new Color32(115, 8, 8, 255);
-        Color32 arterialRed = new Color32(195, 14, 14, 255);
-        Color32 coagulated = new Color32(48, 4, 4, 255);
-
-        // 1. Organic bloody vignette from edges
-        for (int y = 0; y < height; y++)
-        {
-            float ny = (float)y / height;
-            float dy = Mathf.Min(ny, 1f - ny) * 2f;
-
-            for (int x = 0; x < width; x++)
-            {
-                float nx = (float)x / width;
-                float dx = Mathf.Min(nx, 1f - nx) * 2f;
-
-                float edgeDist = Mathf.Min(dx, dy);
-
-                float noise = Mathf.PerlinNoise(nx * 6.5f, ny * 6.5f) * 0.35f +
-                              Mathf.PerlinNoise(nx * 14f, ny * 14f) * 0.15f;
-
-                float threshold = 0.52f + noise;
-                float alpha = 0f;
-
-                if (edgeDist < threshold)
-                {
-                    alpha = Mathf.Clamp01((threshold - edgeDist) / threshold);
-                    alpha = Mathf.Pow(alpha, 1.5f) * 0.95f;
-                }
-
-                if (alpha > 0.01f)
-                {
-                    float colorTone = Mathf.PerlinNoise(nx * 9f, ny * 9f);
-                    Color32 baseColor = Color32.Lerp(deepCrimson, arterialRed, colorTone);
-                    if (noise > 0.32f) baseColor = Color32.Lerp(baseColor, coagulated, 0.55f);
-                    baseColor.a = (byte)(alpha * 255);
-                    pixels[y * width + x] = baseColor;
-                }
-                else
-                {
-                    pixels[y * width + x] = new Color32(0, 0, 0, 0);
-                }
-            }
-        }
-
-        // 2. Add blood drip streaks running down from top
-        int numDrips = 12;
-        for (int d = 0; d < numDrips; d++)
-        {
-            int startX = (int)(Mathf.PerlinNoise(d * 1.7f, 0.35f) * (width - 60) + 30);
-            int dripLength = (int)(Mathf.PerlinNoise(d * 2.3f, 0.75f) * (height * 0.42f) + height * 0.12f);
-            int dripWidth = (int)(Mathf.PerlinNoise(d * 3.1f, 1.15f) * 6f + 4f);
-
-            for (int dy = 0; dy < dripLength; dy++)
-            {
-                int py = height - 1 - dy;
-                if (py < 0 || py >= height) continue;
-
-                float prog = (float)dy / dripLength;
-                float currentWidth = Mathf.Lerp(dripWidth, 1.5f, prog);
-                if (prog > 0.82f) currentWidth = Mathf.Lerp(1.5f, dripWidth * 1.35f, (prog - 0.82f) / 0.18f);
-
-                int w = Mathf.Max(1, (int)currentWidth);
-                for (int px = startX - w; px <= startX + w; px++)
-                {
-                    if (px < 0 || px >= width) continue;
-                    float distFromCenter = Mathf.Abs(px - startX) / (float)w;
-                    float alpha = Mathf.Clamp01(1f - distFromCenter);
-                    int idx = py * width + px;
-                    Color32 existing = pixels[idx];
-                    byte newAlpha = (byte)Mathf.Max(existing.a, (byte)(alpha * 235));
-                    pixels[idx] = new Color32(arterialRed.r, arterialRed.g, arterialRed.b, newAlpha);
-                }
-            }
-        }
-
-        // 3. Add blood splatter clusters (impact droplets)
-        int numSplats = 8;
-        for (int s = 0; s < numSplats; s++)
-        {
-            float cx = Mathf.PerlinNoise(s * 3.7f, 4.2f) * (width * 0.8f) + width * 0.1f;
-            float cy = Mathf.PerlinNoise(s * 5.1f, 2.9f) * (height * 0.8f) + height * 0.1f;
-            float radius = Mathf.PerlinNoise(s * 2.4f, 1.8f) * 24f + 14f;
-
-            DrawCircle(pixels, width, height, (int)cx, (int)cy, (int)radius, deepCrimson);
-
-            int numDroplets = (int)(radius * 0.75f);
-            for (int i = 0; i < numDroplets; i++)
-            {
-                float angle = (float)i / numDroplets * Mathf.PI * 2f + Mathf.PerlinNoise(i, s) * 0.8f;
-                float dist = radius * (1.2f + Mathf.PerlinNoise(i * 1.5f, s * 2f) * 2.2f);
-                int dropX = (int)(cx + Mathf.Cos(angle) * dist);
-                int dropY = (int)(cy + Mathf.Sin(angle) * dist);
-                int dropRadius = Mathf.Max(1, (int)(radius * 0.18f * (1f - dist / (radius * 3.5f))));
-                DrawCircle(pixels, width, height, dropX, dropY, dropRadius, arterialRed);
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply(false, true);
-        return tex;
-    }
-
-    void DrawCircle(Color32[] pixels, int width, int height, int cx, int cy, int radius, Color32 color)
-    {
-        int r2 = radius * radius;
-        for (int y = -radius; y <= radius; y++)
-        {
-            int py = cy + y;
-            if (py < 0 || py >= height) continue;
-            for (int x = -radius; x <= radius; x++)
-            {
-                int px = cx + x;
-                if (px < 0 || px >= width) continue;
-                int d2 = x * x + y * y;
-                if (d2 <= r2)
-                {
-                    float a = Mathf.Clamp01(1f - Mathf.Sqrt(d2) / (float)radius);
-                    int idx = py * width + px;
-                    byte finalA = (byte)Mathf.Max(pixels[idx].a, (byte)(a * 240));
-                    pixels[idx] = new Color32(color.r, color.g, color.b, finalA);
-                }
-            }
-        }
     }
 
     VisualElement BuildStatRow(string labelText, string valueText, bool isDanger = false)

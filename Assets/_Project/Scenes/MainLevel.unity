@@ -857,6 +857,219 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 8894244341936955839, guid: 442c8f975ce23f34faaf54ab349104dc, type: 3}
+--- !u!1001 &933031356
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -4748361991329772099, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 61d631f2705b04b4aa5bf26cf6157772, type: 2}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.16
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.16
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.16
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 19.780212
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.00000023834582
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 65.03934
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_Name
+      value: Pirate clark norpa (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 933031360}
+    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 933031359}
+    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 933031358}
+  m_SourcePrefab: {fileID: -4161369568681901532, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+--- !u!1 &933031357 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
+  m_PrefabInstance: {fileID: 933031356}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &933031358
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 933031357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b1aac9c7743338488ffc2bb403a183a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VillainSightShake
+  player: {fileID: 5118140449740277666}
+  noise: {fileID: 6641262125566317029}
+  sightRange: 18
+  viewAngle: 120
+  eyeHeight: 1.5
+  playerAimHeight: 1
+  maxAmplitude: 1.8
+  frequency: 3
+  fadeIn: 7
+  fadeOut: 2.5
+  scaleWithDistance: 1
+  chaseMaxAmplitude: 3.8
+  chaseMinAmplitude: 1.3
+  chaseFrequency: 6.5
+  chaseRange: 22
+--- !u!114 &933031359
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 933031357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a2fd25a78c26194ba9e1f743f481f7c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VillainAI
+  player: {fileID: 5118140449740277666}
+  wanderSpeed: 1.35
+  investigateSpeed: 2.4
+  chaseSpeed: 3.8
+  wanderRadius: 15
+  waitAtPoint: 2
+  viewDistance: 12
+  viewDistanceFlashlight: 24
+  viewAngle: 100
+  eyeHeight: 1.5
+  loseSightTime: 4
+  canHear: 1
+  hearingSensitivity: 1
+  searchPauseDuration: 1.8
+  searchBranchesToInspect: 2
+  searchBranchRadius: 8
+  enableInterception: 1
+  leadDistance: 3.5
+  interceptCheckInterval: 0.35
+  catchDistance: 1.5
+  headMaterial: {fileID: 0}
+  tunicMaterial: {fileID: 0}
+  pantsMaterial: {fileID: 0}
+  bootMaterial: {fileID: 0}
+  eyeMaterial: {fileID: 0}
+  handMaterial: {fileID: 0}
+  teethMaterial: {fileID: 0}
+  customTurning: 1
+  turnSpeed: 720
+  chaseTurnSpeed: 750
+  turnAngleThreshold: 25
+  turnExitAngleThreshold: 10
+  maxBankAngle: 4.5
+  groundOffset: -0.06
+  walkAnimReferenceSpeed: 0.7
+  runAnimReferenceSpeed: 1.65
+  attackDistance: 2.6
+  attackCooldown: 1.5
+  enableTeleport: 1
+  maxDistanceFromPlayer: 40
+  teleportRange: {x: 15, y: 30}
+  firstTeleportDelay: 6
+  teleportCooldown: 15
+  teleportAttempts: 12
+  teleportSampleRadius: 3
+  avoidVisibleSpots: 1
+  playerSightHalfAngle: 60
+  chaseClips: []
+  chaseVolume: 0.95
+  chaseMinDistance: 2.5
+  chaseMaxDistance: 32
+  chaseMinInterval: 0.8
+  chaseMaxInterval: 2.8
+  playSoundImmediatelyOnChaseStart: 1
+  chasePitchRange: {x: 0.92, y: 1.08}
+  ventLingerTime: {x: 5, y: 8}
+  currentState: 0
+--- !u!195 &933031360
+NavMeshAgent:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 933031357}
+  m_Enabled: 1
+  m_AgentTypeID: 0
+  m_Radius: 0.4
+  m_Speed: 3.5
+  m_Acceleration: 8
+  avoidancePriority: 50
+  m_AngularSpeed: 360
+  m_StoppingDistance: 0
+  m_AutoTraverseOffMeshLink: 1
+  m_AutoBraking: 1
+  m_AutoRepath: 1
+  m_Height: 2
+  m_BaseOffset: 0
+  m_WalkableMask: 4294967295
+  m_ObstacleAvoidanceType: 4
 --- !u!1 &960277368 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -2240839578638515982, guid: 442c8f975ce23f34faaf54ab349104dc, type: 3}
@@ -1333,230 +1546,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -8756931367325940714, guid: 442c8f975ce23f34faaf54ab349104dc, type: 3}
---- !u!1001 &1524290223
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: -4748361991329772099, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_Controller
-      value: 
-      objectReference: {fileID: 9100000, guid: 61d631f2705b04b4aa5bf26cf6157772, type: 2}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.16
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.16
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.16
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 1.29
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -7.89
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_ConstrainProportionsScale
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 294179886088604923, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 4a28b1b2c3d4e5f6a7b8c9d0e1f2a3b4, type: 2}
-    - target: {fileID: 294179886088604923, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: 'm_Materials.Array.data[1]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 7e381a594fff3cc4ea7f673d1c8375d8, type: 2}
-    - target: {fileID: 294179886088604923, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: 'm_Materials.Array.data[2]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 8aaa9fe44547dca4289045aca782af55, type: 2}
-    - target: {fileID: 294179886088604923, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: 'm_Materials.Array.data[3]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 3f19a0a1c2d3e4f5a6b7c8d9e0f1a2b3, type: 2}
-    - target: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_Name
-      value: Pirate clark norpa
-      objectReference: {fileID: 0}
-    - target: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1524290227}
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1524290226}
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1524290225}
-  m_SourcePrefab: {fileID: -4161369568681901532, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
---- !u!1 &1524290224 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 8771091787928289351, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
-  m_PrefabInstance: {fileID: 1524290223}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1524290225
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1524290224}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b1aac9c7743338488ffc2bb403a183a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VillainSightShake
-  player: {fileID: 5118140449740277666}
-  noise: {fileID: 6641262125566317029}
-  sightRange: 18
-  viewAngle: 120
-  eyeHeight: 1.5
-  playerAimHeight: 1
-  maxAmplitude: 3.5
-  frequency: 3
-  fadeIn: 6
-  fadeOut: 2
-  scaleWithDistance: 1
---- !u!114 &1524290226
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1524290224}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a2fd25a78c26194ba9e1f743f481f7c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VillainAI
-  player: {fileID: 5118140449740277666}
-  wanderSpeed: 1.35
-  investigateSpeed: 2.4
-  chaseSpeed: 3.8
-  wanderRadius: 15
-  waitAtPoint: 2
-  viewDistance: 12
-  viewDistanceFlashlight: 24
-  viewAngle: 100
-  eyeHeight: 1.5
-  loseSightTime: 4
-  canHear: 1
-  hearingSensitivity: 1
-  searchPauseDuration: 1.8
-  searchBranchesToInspect: 2
-  searchBranchRadius: 8
-  enableInterception: 1
-  leadDistance: 3.5
-  interceptCheckInterval: 0.35
-  catchDistance: 1.5
-  headMaterial: {fileID: 0}
-  tunicMaterial: {fileID: 0}
-  pantsMaterial: {fileID: 0}
-  bootMaterial: {fileID: 0}
-  eyeMaterial: {fileID: 0}
-  handMaterial: {fileID: 0}
-  teethMaterial: {fileID: 0}
-  customTurning: 1
-  turnSpeed: 720
-  chaseTurnSpeed: 750
-  turnAngleThreshold: 25
-  turnExitAngleThreshold: 10
-  maxBankAngle: 4.5
-  groundOffset: -0.06
-  walkAnimReferenceSpeed: 0.7
-  runAnimReferenceSpeed: 1.65
-  attackDistance: 2.6
-  attackCooldown: 1.5
-  enableTeleport: 1
-  maxDistanceFromPlayer: 40
-  teleportRange: {x: 15, y: 30}
-  firstTeleportDelay: 6
-  teleportCooldown: 15
-  teleportAttempts: 12
-  teleportSampleRadius: 3
-  avoidVisibleSpots: 1
-  playerSightHalfAngle: 60
-  chaseClips: []
-  chaseVolume: 0.95
-  chaseMinDistance: 2.5
-  chaseMaxDistance: 32
-  chaseMinInterval: 0.8
-  chaseMaxInterval: 2.8
-  playSoundImmediatelyOnChaseStart: 1
-  chasePitchRange: {x: 0.92, y: 1.08}
-  currentState: 0
---- !u!195 &1524290227
-NavMeshAgent:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1524290224}
-  m_Enabled: 1
-  m_AgentTypeID: 0
-  m_Radius: 0.8
-  m_Speed: 3.5
-  m_Acceleration: 8
-  avoidancePriority: 50
-  m_AngularSpeed: 360
-  m_StoppingDistance: 0
-  m_AutoTraverseOffMeshLink: 1
-  m_AutoBraking: 1
-  m_AutoRepath: 1
-  m_Height: 2
-  m_BaseOffset: 0
-  m_WalkableMask: 4294967295
-  m_ObstacleAvoidanceType: 4
 --- !u!1 &1527327673 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3845039581440317970, guid: 442c8f975ce23f34faaf54ab349104dc, type: 3}
@@ -1656,6 +1645,7 @@ MonoBehaviour:
   chaseMaxInterval: 2.8
   playSoundImmediatelyOnChaseStart: 1
   chasePitchRange: {x: 0.92, y: 1.08}
+  ventLingerTime: {x: 5, y: 8}
   currentState: 0
 --- !u!195 &1573173748
 NavMeshAgent:
@@ -1666,7 +1656,7 @@ NavMeshAgent:
   m_GameObject: {fileID: 1573173745}
   m_Enabled: 1
   m_AgentTypeID: 0
-  m_Radius: 0.8
+  m_Radius: 0.4
   m_Speed: 3.5
   m_Acceleration: 8
   avoidancePriority: 50
@@ -1719,11 +1709,15 @@ MonoBehaviour:
   viewAngle: 120
   eyeHeight: 1.5
   playerAimHeight: 1
-  maxAmplitude: 3.5
+  maxAmplitude: 1.8
   frequency: 3
-  fadeIn: 6
-  fadeOut: 2
+  fadeIn: 7
+  fadeOut: 2.5
   scaleWithDistance: 1
+  chaseMaxAmplitude: 3.8
+  chaseMinAmplitude: 1.3
+  chaseFrequency: 6.5
+  chaseRange: 22
 --- !u!1 &1582502807 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -4003858618310954216, guid: 442c8f975ce23f34faaf54ab349104dc, type: 3}
@@ -1803,8 +1797,8 @@ MonoBehaviour:
   lightPrefabChance: 0.3
   panelLights: 1
   maxPanelLights: 20
-  panelLightIntensity: 2.2
-  panelLightRange: 8
+  panelLightIntensity: 1.15
+  panelLightRange: 5.5
   panelLightColor: {r: 1, g: 0.96, b: 0.84, a: 1}
   panelFlickerChance: 0.08
   decorationPrefabs:
@@ -1835,6 +1829,16 @@ MonoBehaviour:
   floorTextureMeters: 2
   wallTextureMeters: 2
   ceilingTextureMeters: 5
+  enableWallDecals: 1
+  wallDecalChance: 0.16
+  deadEndDecalChance: 0.75
+  maxWallDecals: 45
+  customDecalMaterials: []
+  enableWallVents: 1
+  maxVents: 12
+  ventChance: 0.12
+  ventMetalMaterial: {fileID: 0}
+  ventDuctMaterial: {fileID: 0}
   floorPrefab: {fileID: 0}
   ceilingPrefab: {fileID: 0}
   wallPrefab: {fileID: 0}
@@ -1842,7 +1846,7 @@ MonoBehaviour:
   flipWallFacing: 0
   surface: {fileID: 1825455911}
   player: {fileID: 5118140449740277666}
-  villain: {fileID: 1524290224}
+  villain: {fileID: 933031357}
   autoAmbience: 1
 --- !u!4 &1692274899
 Transform:
@@ -2760,6 +2764,7 @@ MonoBehaviour:
   menuSceneName: Menu
   showSoundSlider: 1
   showMusicSlider: 1
+  showBrightnessSlider: 1
   showSensitivitySlider: 1
   showGraphicsOption: 1
   showFrameRateOption: 1
@@ -3105,7 +3110,6 @@ SceneRoots:
   m_Roots:
   - {fileID: 410087041}
   - {fileID: 1384730014}
-  - {fileID: 1524290223}
   - {fileID: 1080377301}
   - {fileID: 1223177932869859952}
   - {fileID: 284031474}
@@ -3115,3 +3119,4 @@ SceneRoots:
   - {fileID: 7051110002223334452}
   - {fileID: 7051110002223334462}
   - {fileID: 7051110002223334472}
+  - {fileID: 933031356}

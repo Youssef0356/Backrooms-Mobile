@@ -205,15 +205,19 @@ namespace StarterAssets
             }
 
             // Update sprint exertion
-            bool isSprinting = _fpc != null && _fpc.Input != null && _fpc.Input.sprint && _fpc.CurrentSpeed > 3.0f;
+            bool isSprinting = _fpc != null && _fpc.IsSprinting && _fpc.CurrentSpeed > 3.0f;
             float targetExertion = isSprinting ? 1.0f : 0.0f;
+            if (_fpc != null && _fpc.Stamina != null)
+            {
+                targetExertion = Mathf.Max(targetExertion, (1.0f - _fpc.Stamina.NormalizedStamina) * 0.85f);
+            }
             float exertionRate = isSprinting ? 0.30f : 0.18f;
             _exertion = Mathf.MoveTowards(_exertion, targetExertion, dt * exertionRate);
         }
 
         private void LateUpdate()
         {
-            if (GameOverController.IsGameOver || _cameraRoot == null || _fpc == null) return;
+            if (GameOverController.IsGameOver || _cameraRoot == null || _fpc == null || PlayerVentController.IsInVent) return;
 
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
@@ -232,7 +236,7 @@ namespace StarterAssets
 
             bool isGrounded = _character != null ? _character.isGrounded : true;
             bool isMoving = isGrounded && horizontalSpeed > 0.15f;
-            bool isSprinting = isMoving && _fpc.Input != null && _fpc.Input.sprint && horizontalSpeed > 4.5f;
+            bool isSprinting = isMoving && _fpc.IsSprinting && horizontalSpeed > 4.5f;
 
             // ----------------------------------------------------
             // 1. Idle Respiration / Breathing

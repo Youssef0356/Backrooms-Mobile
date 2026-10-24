@@ -47,6 +47,7 @@ public static class GameSettings
     public static int TargetFrameRate => targetFrameRate;
 
     public static event System.Action<float> OnSensitivityChanged;
+    public static event System.Action<float> OnBrightnessChanged;
     public static event System.Action<int> OnQualityChanged;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -112,6 +113,7 @@ public static class GameSettings
         PlayerPrefs.SetFloat(BrightnessKey, brightness);
         Save();
         ApplyBrightness();          // live preview while dragging the slider
+        OnBrightnessChanged?.Invoke(brightness);
     }
 
     public static void SetQualityLevel(int level)
@@ -181,13 +183,11 @@ public static class GameSettings
     /// profile assets on disk are never touched.
     static void ApplyBrightness()
     {
-        float exposure = (brightness - 0.5f) * 2f;     // 0..1 -> -1..+1 EV
+        float exposure = (brightness - 0.5f) * 2.5f;
 
-        foreach (Volume volume in Object.FindObjectsByType<Volume>())
+        foreach (Volume volume in Object.FindObjectsByType<Volume>(FindObjectsSortMode.None))
         {
-            if (volume.sharedProfile == null) continue;
-
-            VolumeProfile profile = volume.profile;    // runtime copy
+            VolumeProfile profile = volume.profile != null ? volume.profile : volume.sharedProfile;
             if (profile == null) continue;
 
             if (!profile.TryGet<ColorAdjustments>(out ColorAdjustments color))

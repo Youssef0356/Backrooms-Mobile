@@ -214,7 +214,7 @@ public class SurvivalDialogueHUD : MonoBehaviour
         yield return new WaitForSecondsRealtime(introStartDelay);
         if (GameOverController.IsGameOver || VictoryController.IsGameWon) yield break;
 
-        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
+        bool isMobile = PlatformUtils.IsMobile;
 
         // 1. Mission / Situation
         Enqueue(new DialogueEntry(

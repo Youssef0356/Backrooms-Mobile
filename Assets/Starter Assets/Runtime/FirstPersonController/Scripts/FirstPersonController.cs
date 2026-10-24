@@ -71,6 +71,8 @@ namespace StarterAssets
 		private CharacterController _controller;
 		private StarterAssetsInputs _input;
 		private GameObject _mainCamera;
+		private PlayerStamina _stamina;
+		private bool _isSprinting;
 
 		private const float _threshold = 0.01f;
 
@@ -83,6 +85,31 @@ namespace StarterAssets
 		public CharacterController Controller => _controller;
 		public float CurrentSpeed => _speed;
 		public float VerticalVelocity => _verticalVelocity;
+		public bool IsSprinting => _isSprinting;
+		public PlayerStamina Stamina => _stamina;
+
+		// Backrooms: exposed so other systems (e.g. vent hiding) can take over the camera and hand it back cleanly
+		public float LookSensitivity => _sensitivity;
+		public bool UsesDirectLookDelta => IsCurrentDeviceMouse || TouchscreenInput.IsTouchLookActive;
+		public float CurrentPitch => _cinemachineTargetPitch;
+
+		/// <summary>Overwrites the stored camera pitch (and applies it) so control resumes without a snap.</summary>
+		public void SetPitch(float pitch)
+		{
+			_cinemachineTargetPitch = ClampAngle(pitch, BottomClamp, TopClamp);
+			if (CinemachineCameraTarget != null)
+				CinemachineCameraTarget.transform.localRotation = Quaternion.Euler(_cinemachineTargetPitch, 0.0f, 0.0f);
+		}
+
+		/// <summary>Clears leftover velocity / jump state, used when control is returned after a scripted sequence.</summary>
+		public void ResetMotionState()
+		{
+			_speed = 0f;
+			_verticalVelocity = -2f;
+			_rotationVelocity = 0f;
+			_jumpTimeoutDelta = JumpTimeout;
+			if (_input != null) _input.jump = false;
+		}
 
 		private bool IsCurrentDeviceMouse
 		{
@@ -99,6 +126,12 @@ namespace StarterAssets
 		private void Awake()
 		{
 			_sensitivity = Mathf.Clamp(PlayerPrefs.GetFloat("backrooms.sensitivity", 1f), 0.1f, 2f);
+
+			_stamina = GetComponent<PlayerStamina>();
+			if (_stamina == null)
+			{
+				_stamina = gameObject.AddComponent<PlayerStamina>();
+			}
 
 			// get a reference to our main camera
 			if (_mainCamera == null)
@@ -191,14 +224,19 @@ namespace StarterAssets
 
 		private void Move()
 		{
-			// set target speed based on move speed, sprint speed and if sprint is pressed
-			float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+			bool isMoving = _input.move != Vector2.zero;
+			bool wantsToSprint = _input.sprint && isMoving && Grounded;
+			bool canSprint = _stamina == null || _stamina.CanSprint;
+			_isSprinting = wantsToSprint && canSprint;
 
-			// a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
+			if (_stamina != null)
+			{
+				_stamina.UpdateMovement(_isSprinting, isMoving, Time.deltaTime);
+			}
 
-			// note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-			// if there is no input, set the target speed to 0
-			if (_input.move == Vector2.zero) targetSpeed = 0.0f;
+			// set target speed based on move speed, sprint speed and whether sprint is actively maintained
+			float targetSpeed = _isSprinting ? SprintSpeed : MoveSpeed;
+			if (!isMoving) targetSpeed = 0.0f;
 
 			// a reference to the players current horizontal velocity
 			float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
@@ -231,7 +269,13 @@ namespace StarterAssets
 			// move the player
 			if (_controller != null && _controller.enabled)
 			{
-				_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+				CollisionFlags flags = _controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+
+				// Head-bump / Ceiling hit detection: cancel upward velocity immediately so player drops naturally
+				if ((flags & CollisionFlags.Above) != 0 && _verticalVelocity > 0.0f)
+				{
+					_verticalVelocity = -0.5f;
+				}
 			}
 		}
 
@@ -251,8 +295,21 @@ namespace StarterAssets
 				// Jump
 				if (_input.jump && _jumpTimeoutDelta <= 0.0f)
 				{
-					// the square root of H * -2 * G = how much velocity needed to reach desired height
-					_verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+					// Check ceiling clearance above head before launching a full jump (prevents jumping through ceiling from high furniture)
+					float headTop = transform.position.y + _controller.center.y + (_controller.height * 0.5f);
+					Vector3 headOrigin = new Vector3(transform.position.x, headTop - 0.15f, transform.position.z);
+					bool ceilingBlocked = Physics.SphereCast(headOrigin, _controller.radius * 0.75f, Vector3.up, out _, 0.35f, GroundLayers, QueryTriggerInteraction.Ignore);
+
+					if (!ceilingBlocked)
+					{
+						// the square root of H * -2 * G = how much velocity needed to reach desired height
+						_verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+					}
+					else
+					{
+						// Already touching or too close to ceiling: small subtle bounce
+						_verticalVelocity = 0.5f;
+					}
 				}
 
 				// jump timeout

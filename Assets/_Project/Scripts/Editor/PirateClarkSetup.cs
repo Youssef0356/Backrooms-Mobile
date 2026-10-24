@@ -30,6 +30,16 @@ public static class PirateClarkSetup
     const string ControllerPath = "Assets/_Project/Art/Characters/Clark/ClarkVillain.controller";
     const string VillainNameFragment = "clark";
 
+    [InitializeOnLoadMethod]
+    private static void AutoSetup()
+    {
+        EditorApplication.delayCall += () =>
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            SetUpVillainMenu();
+        };
+    }
+
     [MenuItem("Backrooms/Pirate Clark/Build Clark Animator")]
     public static void BuildAnimatorMenu()
     {
@@ -69,6 +79,10 @@ public static class PirateClarkSetup
         animator.applyRootMotion = false;                       // the clips are in place, the Agent moves him
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // he is part of the scare, never skip a frame
 
+        // Fix model scale: the raw glTF is ~11m tall; 0.16 scale normalizes him to ~1.8m human height
+        villain.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
+        EditorUtility.SetDirty(villain.gameObject);
+        EditorUtility.SetDirty(villain.transform);
         EditorUtility.SetDirty(animator);
 
         string generatorReport = PointGeneratorAt(villain.gameObject);
