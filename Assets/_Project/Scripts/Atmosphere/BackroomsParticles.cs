@@ -10,13 +10,19 @@ using UnityEngine;
 public class BackroomsParticles : MonoBehaviour
 {
     [Header("Dust Motes")]
-    public bool enableDustMotes = true;
+    [Tooltip("Floating dust motes around the player. Disabled to prevent particles from streaming past the player when moving.")]
+    public bool enableDustMotes = false;
     public int maxDustParticles = 100;
     public float dustRadius = 8f;
     public Color dustColor = new Color(0.95f, 0.92f, 0.75f, 0.45f);
 
     [Header("Entity Miasma Aura")]
-    public bool enableEntityAura = true;
+    [Tooltip("Entity shadow miasma aura. Disabled so monster Clark moves cleanly with no black trail particles.")]
+    public bool enableEntityAura = false;
+    [Tooltip("World height offset above Clark's base where the aura is centered (chest/torso level).")]
+    public float entityAuraHeight = 1.15f;
+    [Tooltip("Radius of the aura sphere in world units.")]
+    public float entityAuraRadius = 0.6f;
     public Color miasmaColor = new Color(0.05f, 0.04f, 0.08f, 0.55f);
 
     [Header("Ceiling Sparks")]
@@ -47,6 +53,39 @@ public class BackroomsParticles : MonoBehaviour
         Instance = this;
 
         glowTexture = CreateSoftRadialTexture();
+    }
+
+    void OnEnable()
+    {
+        GameSettings.OnQualityChanged += HandleQualityChanged;
+        ApplyQualitySettings(GameSettings.QualityLevel);
+    }
+
+    void OnDisable()
+    {
+        GameSettings.OnQualityChanged -= HandleQualityChanged;
+    }
+
+    void HandleQualityChanged(int q)
+    {
+        ApplyQualitySettings(q);
+    }
+
+    void ApplyQualitySettings(int qualityIndex)
+    {
+        if (dustSystem != null)
+        {
+            var main = dustSystem.main;
+            int count = (qualityIndex == 0) ? 20 : (qualityIndex == 1 ? 50 : maxDustParticles);
+            main.maxParticles = count;
+        }
+
+        if (miasmaSystem != null)
+        {
+            var main = miasmaSystem.main;
+            int count = (qualityIndex == 0) ? 20 : (qualityIndex == 1 ? 35 : 50);
+            main.maxParticles = count;
+        }
     }
 
     void Start()
@@ -201,6 +240,7 @@ public class BackroomsParticles : MonoBehaviour
         col.color = grad;
 
         dustSystem.Play();
+        ApplyQualitySettings(GameSettings.QualityLevel);
     }
 
     void SetupEntityAura()
@@ -208,8 +248,10 @@ public class BackroomsParticles : MonoBehaviour
         if (villain == null) return;
 
         GameObject auraObj = new GameObject("Entity_AnomalousAura");
-        auraObj.transform.SetParent(villain, false);
-        auraObj.transform.localPosition = Vector3.up * 1.0f;
+        // Keep auraObj parented to BackroomsParticles (lossyScale 1, 1, 1) rather than villain (scale 0.16)
+        // so particle radius, velocity, and bounds are in true world meters and never crushed by import scale.
+        auraObj.transform.SetParent(transform, false);
+        auraObj.transform.position = villain.position + Vector3.up * entityAuraHeight;
 
         miasmaSystem = auraObj.AddComponent<ParticleSystem>();
         ParticleSystemRenderer rend = auraObj.GetComponent<ParticleSystemRenderer>();
@@ -220,17 +262,19 @@ public class BackroomsParticles : MonoBehaviour
         var main = miasmaSystem.main;
         main.maxParticles = 50;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.scalingMode = ParticleSystemScalingMode.Hierarchy;
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.4f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.45f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.15f, 0.4f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
         main.startColor = miasmaColor;
+        main.gravityModifier = -0.04f; // subtle upward drift so particles rise rather than sinking into floor
 
         var emission = miasmaSystem.emission;
         emission.rateOverTime = 16f;
 
         var shape = miasmaSystem.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.7f;
+        shape.radius = entityAuraRadius;
 
         var noise = miasmaSystem.noise;
         noise.enabled = true;
@@ -259,6 +303,7 @@ public class BackroomsParticles : MonoBehaviour
         col.color = grad;
 
         miasmaSystem.Play();
+        ApplyQualitySettings(GameSettings.QualityLevel);
     }
 
     void SetupSparks()
@@ -311,14 +356,44 @@ public class BackroomsParticles : MonoBehaviour
             if (miasmaSystem == null && villain != null && enableEntityAura) SetupEntityAura();
         }
 
-        // Modulate villain aura based on chase state
+        // If entity aura is disabled, destroy any existing system so no trail particles ever render
+        if (!enableEntityAura && miasmaSystem != null)
+        {
+            Destroy(miasmaSystem.gameObject);
+            miasmaSystem = null;
+        }
+
+        // Mute dust motes when player is moving so particles do not stream past the screen
+        if (dustSystem != null && player != null)
+        {
+            var emission = dustSystem.emission;
+            CharacterController cc = player.GetComponent<CharacterController>();
+            bool isMoving = cc != null && cc.velocity.sqrMagnitude > 0.05f;
+            emission.enabled = enableDustMotes && !isMoving;
+        }
+    }
+
+    void LateUpdate()
+    {
+        // Follow villain position at torso/chest height without inheriting model scale
         if (miasmaSystem != null && villain != null)
         {
-            VillainAI ai = villain.GetComponent<VillainAI>();
-            if (ai != null)
+            bool shouldEmit = enableEntityAura && villain.gameObject.activeInHierarchy;
+            var emission = miasmaSystem.emission;
+            if (emission.enabled != shouldEmit)
             {
-                var emission = miasmaSystem.emission;
-                emission.rateOverTime = (ai.CurrentState == VillainAI.State.Chase) ? 36f : 16f;
+                emission.enabled = shouldEmit;
+            }
+
+            if (shouldEmit)
+            {
+                miasmaSystem.transform.position = villain.position + Vector3.up * entityAuraHeight;
+
+                VillainAI ai = villain.GetComponent<VillainAI>();
+                if (ai != null)
+                {
+                    emission.rateOverTime = (ai.CurrentState == VillainAI.State.Chase) ? 36f : 16f;
+                }
             }
         }
     }

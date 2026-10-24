@@ -65,6 +65,11 @@ namespace StarterAssets
 		{
 			sprint = newSprintState;
 		}
+
+		private void Start()
+		{
+			SetCursorState(cursorLocked);
+		}
 		
 		private void OnApplicationFocus(bool hasFocus)
 		{
@@ -74,6 +79,7 @@ namespace StarterAssets
 		private void SetCursorState(bool newState)
 		{
 			Cursor.lockState = newState ? CursorLockMode.Locked : CursorLockMode.None;
+			Cursor.visible = !newState;
 		}
 	}
 	

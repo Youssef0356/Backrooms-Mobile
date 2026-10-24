@@ -65,6 +65,16 @@ public static class MenuSceneSetup
         if (panel.GetComponent<MenuCameraHUD>() == null) panel.gameObject.AddComponent<MenuCameraHUD>();
         if (panel.GetComponent<MainMenuController>() == null) panel.gameObject.AddComponent<MainMenuController>();
 
+        // In Unity 6, having both UIDocument and PanelRenderer on the same GameObject causes
+        // the UI to render twice on top of itself. Remove any redundant PanelRenderer.
+        foreach (var r in panel.GetComponents<Renderer>())
+        {
+            if (r != null && r.GetType().Name == "PanelRenderer")
+            {
+                Object.DestroyImmediate(r);
+            }
+        }
+
         // the HUD needs the same pixels per unit as the panel settings
         MenuCameraHUD hud = panel.GetComponent<MenuCameraHUD>();
         if (hud != null && settings != null)

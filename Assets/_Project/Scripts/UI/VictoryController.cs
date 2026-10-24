@@ -111,6 +111,10 @@ public class VictoryController : MonoBehaviour
 
         if (Instance != null)
         {
+            if (AdManager.Instance != null)
+            {
+                AdManager.Instance.RecordSurvivalTime(Instance.timeElapsed);
+            }
             Instance.StartCoroutine(Instance.VictorySequenceRoutine());
         }
         else
@@ -173,7 +177,19 @@ public class VictoryController : MonoBehaviour
         IsGameWon = false;
         Time.timeScale = 1f;
         RestoreCursor();
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+
+        if (AdManager.Instance != null)
+        {
+            AdManager.Instance.TryShowInterstitial(() =>
+            {
+                AdManager.Instance.ResetRunState();
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            });
+        }
+        else
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
     }
 
     void OnMenuClicked()
@@ -182,10 +198,23 @@ public class VictoryController : MonoBehaviour
         Time.timeScale = 1f;
         RestoreCursor();
 
-        if (Application.CanStreamedLevelBeLoaded(menuSceneName))
-            SceneManager.LoadScene(menuSceneName);
+        Action loadMenu = () =>
+        {
+            if (AdManager.Instance != null) AdManager.Instance.ResetRunState();
+            if (Application.CanStreamedLevelBeLoaded(menuSceneName))
+                SceneManager.LoadScene(menuSceneName);
+            else
+                SceneManager.LoadScene(0);
+        };
+
+        if (AdManager.Instance != null)
+        {
+            AdManager.Instance.TryShowInterstitial(loadMenu);
+        }
         else
-            SceneManager.LoadScene(0);
+        {
+            loadMenu();
+        }
     }
 
     void HideMobileControls()

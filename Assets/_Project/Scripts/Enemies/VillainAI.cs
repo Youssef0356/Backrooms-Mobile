@@ -58,8 +58,14 @@ public class VillainAI : MonoBehaviour
     [Header("Turning & Alignment")]
     [Tooltip("Whether to manually control turning so the villain never slides or strafes sideways.")]
     public bool customTurning = true;
-    [Tooltip("How fast the villain pivots to face where he is moving (deg/sec).")]
-    public float turnSpeed = 720f;
+    [Tooltip("How fast the villain pivots to face where he is moving while wandering or investigating (deg/sec).")]
+    public float turnSpeed = 480f;
+    [Tooltip("How fast the villain pivots when chasing the player (deg/sec).")]
+    public float chaseTurnSpeed = 750f;
+    [Tooltip("Angle threshold (degrees) that triggers an in-place turn in Idle before forward movement begins.")]
+    public float turnAngleThreshold = 25f;
+    [Tooltip("Angle threshold (degrees) below which the in-place turn finishes and forward movement resumes.")]
+    public float turnExitAngleThreshold = 10f;
     [Tooltip("Subtle centrifugal torso roll when cornering at speed (degrees).")]
     public float maxBankAngle = 4.5f;
 
@@ -90,6 +96,24 @@ public class VillainAI : MonoBehaviour
     public bool avoidVisibleSpots = true;
     public float playerSightHalfAngle = 60f;
 
+    [Header("Chase Audio (Composition SFX)")]
+    [Tooltip("Clips played while running after the player. Auto-loaded from Resources/Composition if empty.")]
+    public AudioClip[] chaseClips;
+    [Tooltip("Volume multiplier for chase audio.")]
+    [Range(0f, 1f)] public float chaseVolume = 0.95f;
+    [Tooltip("Minimum 3D distance where chase noises are heard at maximum volume (meters).")]
+    public float chaseMinDistance = 2.5f;
+    [Tooltip("Maximum 3D distance where chase noises attenuate into silence (meters).")]
+    public float chaseMaxDistance = 32f;
+    [Tooltip("Minimum silent interval between noises while chasing (seconds).")]
+    public float chaseMinInterval = 0.8f;
+    [Tooltip("Maximum silent interval between noises while chasing (seconds).")]
+    public float chaseMaxInterval = 2.8f;
+    [Tooltip("Play a terrifying noise immediately upon spotting the player and beginning the chase.")]
+    public bool playSoundImmediatelyOnChaseStart = true;
+    [Tooltip("Random pitch range applied to each chase noise for organic horror variation.")]
+    public Vector2 chasePitchRange = new Vector2(0.92f, 1.08f);
+
     public enum State { Wander, Investigate, Chase }
     [Header("Debug Info")]
     public State currentState = State.Wander;
@@ -117,6 +141,8 @@ public class VillainAI : MonoBehaviour
     Transform headBone;
     float currentBankAngle;
     float previousYaw;
+    bool isPivotingOnSpot;
+    float currentForwardSpeed;
 
     bool hasTeleported;
     bool hasCaught;
@@ -124,9 +150,24 @@ public class VillainAI : MonoBehaviour
     bool hasSpeed, hasChasing, hasAttack1, hasAttack2;
     int speedHash, chasingHash, attack1Hash, attack2Hash;
 
+    AudioSource chaseAudioSource;
+    Coroutine chaseAudioRoutine;
+    Coroutine chaseFadeRoutine;
+    int lastPlayedChaseClipIndex = -1;
+
+    public static VillainAI Instance { get; private set; }
+    float reviveGraceTimer = 0f;
+
     void Awake()
     {
+        Instance = this;
         ApplyEditableMaterials();
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        StopChaseAudio(fadeOut: false);
     }
 
     [ContextMenu("Apply Editable Materials")]
@@ -179,6 +220,7 @@ public class VillainAI : MonoBehaviour
     void OnDisable()
     {
         PlayerNoiseEmitter.OnNoiseEmitted -= OnNoiseHeard;
+        StopChaseAudio(fadeOut: false);
     }
 
     void Start()
@@ -227,6 +269,7 @@ public class VillainAI : MonoBehaviour
         }
 
         FindHeadBone();
+        SetupChaseAudio();
         previousYaw = transform.eulerAngles.y;
 
         if (agent != null && agent.isOnNavMesh)
@@ -250,12 +293,18 @@ public class VillainAI : MonoBehaviour
             waitTimer = 0f;
             lostTimer = 0f;
             teleportTimer = 0f;
+            StopChaseAudio(fadeOut: false);
             GoToRandomPoint();
         }
     }
 
     void Update()
     {
+        if (reviveGraceTimer > 0f)
+        {
+            reviveGraceTimer -= Time.deltaTime;
+        }
+
         if (hasCaught)
         {
             if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
@@ -444,19 +493,20 @@ public class VillainAI : MonoBehaviour
                 remainingBranches = searchBranchesToInspect;
                 isPausedSearching = false;
                 SetChasing(false);
+                StopChaseAudio(fadeOut: true);
                 return;
             }
         }
 
         // Check catch & attack
-        if (Vector3.Distance(transform.position, player.position) <= catchDistance)
+        if (reviveGraceTimer <= 0f && Vector3.Distance(transform.position, player.position) <= catchDistance)
         {
             OnCaughtPlayer();
         }
         else
         {
             hasCaught = false;
-            UpdateAttack();
+            if (reviveGraceTimer <= 0f) UpdateAttack();
         }
     }
 
@@ -464,6 +514,7 @@ public class VillainAI : MonoBehaviour
     {
         currentState = State.Chase;
         agent.speed = chaseSpeed;
+        if (agent.isActiveAndEnabled && agent.isOnNavMesh) agent.isStopped = false;
         SetChasing(true);
         lostTimer = 0f;
         attackTimer = 0f;
@@ -471,6 +522,8 @@ public class VillainAI : MonoBehaviour
         lastSeenPlayerPos = player.position;
         lastPlayerPos = player.position;
         agent.SetDestination(player.position);
+
+        StartChaseAudio();
     }
 
     // ---------------- Hearing System ----------------
@@ -507,7 +560,7 @@ public class VillainAI : MonoBehaviour
 
     bool CanSeePlayer()
     {
-        if (player == null) return false;
+        if (player == null || reviveGraceTimer > 0f) return false;
 
         if (cachedFlashlight == null)
             cachedFlashlight = player.GetComponentInChildren<Flashlight>();
@@ -593,45 +646,66 @@ public class VillainAI : MonoBehaviour
     {
         if (agent == null || !agent.isOnNavMesh) return;
 
-        Vector3 moveDir = agent.desiredVelocity;
-        moveDir.y = 0f;
-
         float baseSpeed = GetBaseStateSpeed();
+        float currentTurnSpeed = (currentState == State.Chase) ? chaseTurnSpeed : turnSpeed;
 
-        if (moveDir.sqrMagnitude > 0.05f)
+        // Check if there is an active destination along the path
+        bool hasDestination = agent.hasPath && !agent.isStopped && agent.remainingDistance > (agent.stoppingDistance + 0.15f);
+
+        Vector3 targetDir = Vector3.zero;
+
+        if (hasDestination)
         {
-            Vector3 targetDir = moveDir.normalized;
-            Quaternion targetRot = Quaternion.LookRotation(targetDir);
-
-            // Snappy turn towards target direction
-            float angleDelta = Quaternion.Angle(transform.rotation, targetRot);
-            float turnFactor = Mathf.Clamp(angleDelta / 20f, 0.8f, 1.8f);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * turnFactor * Time.deltaTime);
-
-            float forwardDot = Vector3.Dot(transform.forward, targetDir);
-
-            // If the villain is not yet facing forward along the path (angle > 53 degrees),
-            // halt movement so he pivots on the spot and NEVER walks or slides backward!
-            if (forwardDot < 0.6f)
+            targetDir = agent.steeringTarget - transform.position;
+            targetDir.y = 0f;
+            if (targetDir.sqrMagnitude < 0.04f && agent.desiredVelocity.sqrMagnitude > 0.04f)
             {
-                agent.isStopped = true;
+                targetDir = agent.desiredVelocity;
+                targetDir.y = 0f;
+            }
+        }
+        else if (currentState == State.Chase && player != null)
+        {
+            targetDir = player.position - transform.position;
+            targetDir.y = 0f;
+        }
+
+        if (targetDir.sqrMagnitude > 0.04f)
+        {
+            targetDir.Normalize();
+            float angleDelta = Vector3.Angle(transform.forward, targetDir);
+
+            // Trigger an in-place turn if heading deviates significantly from target direction
+            if (!isPivotingOnSpot && angleDelta > turnAngleThreshold)
+            {
+                isPivotingOnSpot = true;
+            }
+            // Finish in-place turn once aligned within tolerance
+            else if (isPivotingOnSpot && angleDelta <= turnExitAngleThreshold)
+            {
+                isPivotingOnSpot = false;
+            }
+
+            // Pivot towards the target direction
+            Quaternion targetRot = Quaternion.LookRotation(targetDir);
+            float turnBoost = isPivotingOnSpot ? 1.35f : 1.0f;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, currentTurnSpeed * turnBoost * Time.deltaTime);
+
+            if (isPivotingOnSpot || !hasDestination)
+            {
+                // In-place turn: halt forward translation completely so animator plays IDLE
+                currentForwardSpeed = Mathf.MoveTowards(currentForwardSpeed, 0f, 18f * Time.deltaTime);
                 agent.velocity = Vector3.zero;
-                agent.speed = 0f;
             }
             else
             {
-                agent.isStopped = false;
-                float alignment = Mathf.Clamp01((forwardDot - 0.6f) / 0.4f);
-                agent.speed = Mathf.Lerp(baseSpeed * 0.4f, baseSpeed, alignment);
-            }
+                // Smoothly accelerate forward along facing direction (ZERO lateral slide!)
+                float alignment = Mathf.Clamp01((Vector3.Dot(transform.forward, targetDir) - 0.7f) / 0.3f);
+                float desiredSpeed = Mathf.Lerp(baseSpeed * 0.5f, baseSpeed, alignment);
+                currentForwardSpeed = Mathf.MoveTowards(currentForwardSpeed, desiredSpeed, 12f * Time.deltaTime);
 
-            // Strictly eliminate any reverse velocity component
-            Vector3 localVel = transform.InverseTransformDirection(agent.velocity);
-            if (localVel.z < 0f)
-            {
-                localVel.z = 0f;
-                localVel.x = 0f;
-                agent.velocity = transform.TransformDirection(localVel);
+                // Movement is STRICTLY in transform.forward: never strafes or slides sideways!
+                agent.velocity = transform.forward * currentForwardSpeed;
             }
 
             // Corner Banking (Subtle physical roll tilt into sharp turns)
@@ -649,26 +723,15 @@ public class VillainAI : MonoBehaviour
         }
         else
         {
+            isPivotingOnSpot = false;
+            currentForwardSpeed = Mathf.MoveTowards(currentForwardSpeed, 0f, 18f * Time.deltaTime);
+            agent.velocity = Vector3.zero;
+
             previousYaw = transform.eulerAngles.y;
             currentBankAngle = Mathf.Lerp(currentBankAngle, 0f, Time.deltaTime * 6f);
             if (modelRoot != null)
             {
                 modelRoot.localRotation = Quaternion.Euler(0f, 0f, currentBankAngle);
-            }
-
-            agent.isStopped = false;
-            agent.speed = baseSpeed;
-
-            if (currentState == State.Chase && player != null)
-            {
-                // When stopped or close, face the player directly
-                Vector3 toPlayer = player.position - transform.position;
-                toPlayer.y = 0f;
-                if (toPlayer.sqrMagnitude > 0.05f)
-                {
-                    Quaternion targetRot = Quaternion.LookRotation(toPlayer);
-                    transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * Time.deltaTime);
-                }
             }
         }
     }
@@ -677,38 +740,30 @@ public class VillainAI : MonoBehaviour
     {
         if (anim == null) return;
 
-        // Forward ground speed only - never feed backward velocity into forward step animations
-        Vector3 localVel = transform.InverseTransformDirection(agent.velocity);
-        float forwardGroundSpeed = Mathf.Max(0f, localVel.z);
-
-        Vector3 moveDir = agent.desiredVelocity;
-        moveDir.y = 0f;
-        bool isPivotingOnSpot = agent.isStopped || (moveDir.sqrMagnitude > 0.05f && Vector3.Dot(transform.forward, moveDir.normalized) < 0.6f);
-
         if (hasSpeed)
         {
-            // If pivoting on spot or stopped, display speed is 0 so animator plays Idle, not Walk
-            float targetDisplaySpeed = isPivotingOnSpot ? 0f : forwardGroundSpeed;
-            anim.SetFloat(speedHash, targetDisplaySpeed, 0.10f, Time.deltaTime);
+            // If pivoting in place or stopped, feed 0 so the animator plays the IDLE clip cleanly
+            float targetDisplaySpeed = isPivotingOnSpot ? 0f : currentForwardSpeed;
+            anim.SetFloat(speedHash, targetDisplaySpeed, 0.12f, Time.deltaTime);
         }
 
-        // When standing still or pivoting, play at normal rate for idle / attacks
-        if (forwardGroundSpeed < 0.08f || isPivotingOnSpot)
+        // When standing still or pivoting in place, normal 1.0x playback for Idle / Attack clips
+        if (currentForwardSpeed < 0.10f || isPivotingOnSpot)
         {
             anim.speed = 1f;
             return;
         }
 
         float reference = walkAnimReferenceSpeed;
-        if (currentState == State.Chase || forwardGroundSpeed > 2.2f)
+        if (currentState == State.Chase || currentForwardSpeed > 2.2f)
         {
             reference = runAnimReferenceSpeed;
         }
 
         if (reference < 0.1f) reference = 0.1f;
 
-        // Directly link playback rate to real ground speed so feet never slide
-        anim.speed = Mathf.Clamp(forwardGroundSpeed / reference, 0.4f, 3.0f);
+        // Directly link playback rate to real forward ground speed so footsteps never slide
+        anim.speed = Mathf.Clamp(currentForwardSpeed / reference, 0.4f, 3.0f);
     }
 
     void LateUpdate()
@@ -786,6 +841,7 @@ public class VillainAI : MonoBehaviour
     {
         if (hasCaught) return;
         hasCaught = true;
+        StopChaseAudio(fadeOut: false);
 
         if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
         {
@@ -813,6 +869,35 @@ public class VillainAI : MonoBehaviour
         }
 
         GameOverController.TriggerDefeat(transform);
+    }
+
+    /// <summary>
+    /// Resets the entity when the player watches a rewarded revive ad.
+    /// Clears caught state, teleports the monster away to an unseen corridor,
+    /// and grants a grace period where the monster cannot detect or catch the player.
+    /// </summary>
+    public void ResetAfterRevive(float graceSeconds = 6f)
+    {
+        hasCaught = false;
+        reviveGraceTimer = graceSeconds;
+        currentState = State.Wander;
+        SetChasing(false);
+        StopChaseAudio(fadeOut: false);
+
+        if (anim != null)
+        {
+            if (hasAttack1) anim.ResetTrigger(attack1Hash);
+            if (hasAttack2) anim.ResetTrigger(attack2Hash);
+            anim.Play("Walk", 0, 0f);
+        }
+
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+            agent.speed = wanderSpeed;
+        }
+
+        TeleportNearPlayer();
     }
 
     void CheckReposition()
@@ -843,6 +928,7 @@ public class VillainAI : MonoBehaviour
         agent.Warp(chosen);
         currentState = State.Wander;
         SetChasing(false);
+        StopChaseAudio(fadeOut: false);
         agent.speed = wanderSpeed;
         waitTimer = 0f;
         lostTimer = 0f;
@@ -909,5 +995,183 @@ public class VillainAI : MonoBehaviour
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(lastSeenPlayerPos, 1.2f);
         }
+    }
+
+    // ---------------- Chase Audio (Composition SFX) ----------------
+
+    void SetupChaseAudio()
+    {
+        LoadChaseClipsIfEmpty();
+
+        Transform attachTarget = headBone != null ? headBone : transform;
+        Transform existing = attachTarget.Find("VillainChaseAudio");
+        GameObject audioObj;
+        if (existing != null)
+        {
+            audioObj = existing.gameObject;
+        }
+        else
+        {
+            audioObj = new GameObject("VillainChaseAudio");
+            audioObj.transform.SetParent(attachTarget, false);
+            audioObj.transform.localPosition = Vector3.zero;
+        }
+
+        chaseAudioSource = audioObj.GetComponent<AudioSource>();
+        if (chaseAudioSource == null)
+        {
+            chaseAudioSource = audioObj.AddComponent<AudioSource>();
+        }
+
+        chaseAudioSource.playOnAwake = false;
+        chaseAudioSource.loop = false;
+        chaseAudioSource.spatialBlend = 1.0f; // 100% 3D spatial audio
+        chaseAudioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        chaseAudioSource.minDistance = chaseMinDistance;
+        chaseAudioSource.maxDistance = chaseMaxDistance;
+        chaseAudioSource.spread = 60f;
+        chaseAudioSource.dopplerLevel = 0f;
+        chaseAudioSource.priority = 64; // High priority so it is never dropped by the audio engine
+        chaseAudioSource.volume = chaseVolume * GameSettings.MasterVolume;
+    }
+
+    void LoadChaseClipsIfEmpty()
+    {
+        if (chaseClips == null || chaseClips.Length == 0)
+        {
+            chaseClips = Resources.LoadAll<AudioClip>("Composition");
+            if (chaseClips == null || chaseClips.Length == 0)
+            {
+                if (MonsterCompositionAudio.Instance != null && MonsterCompositionAudio.Instance.compositionClips != null)
+                {
+                    chaseClips = MonsterCompositionAudio.Instance.compositionClips;
+                }
+                else
+                {
+                    chaseClips = Resources.LoadAll<AudioClip>("SFX");
+                }
+            }
+        }
+    }
+
+    AudioClip PickNextChaseClip()
+    {
+        if (chaseClips == null || chaseClips.Length == 0)
+        {
+            LoadChaseClipsIfEmpty();
+        }
+
+        if (chaseClips == null || chaseClips.Length == 0) return null;
+        if (chaseClips.Length == 1) return chaseClips[0];
+
+        int index = Random.Range(0, chaseClips.Length);
+        if (index == lastPlayedChaseClipIndex)
+        {
+            index = (index + 1 + Random.Range(0, chaseClips.Length - 1)) % chaseClips.Length;
+        }
+        lastPlayedChaseClipIndex = index;
+        return chaseClips[index];
+    }
+
+    void StartChaseAudio()
+    {
+        if (chaseFadeRoutine != null)
+        {
+            StopCoroutine(chaseFadeRoutine);
+            chaseFadeRoutine = null;
+        }
+
+        if (chaseAudioRoutine != null) return;
+        chaseAudioRoutine = StartCoroutine(ChaseAudioLoop());
+    }
+
+    void StopChaseAudio(bool fadeOut = true)
+    {
+        if (chaseAudioRoutine != null)
+        {
+            StopCoroutine(chaseAudioRoutine);
+            chaseAudioRoutine = null;
+        }
+
+        if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+        {
+            if (fadeOut && gameObject.activeInHierarchy)
+            {
+                if (chaseFadeRoutine != null) StopCoroutine(chaseFadeRoutine);
+                chaseFadeRoutine = StartCoroutine(FadeOutChaseAudio(0.45f));
+            }
+            else
+            {
+                chaseAudioSource.Stop();
+            }
+        }
+    }
+
+    System.Collections.IEnumerator FadeOutChaseAudio(float duration)
+    {
+        if (chaseAudioSource == null) yield break;
+        float startVol = chaseAudioSource.volume;
+        float timer = 0f;
+        while (timer < duration && chaseAudioSource != null && chaseAudioSource.isPlaying)
+        {
+            timer += Time.deltaTime;
+            chaseAudioSource.volume = Mathf.Lerp(startVol, 0f, timer / duration);
+            yield return null;
+        }
+        if (chaseAudioSource != null)
+        {
+            chaseAudioSource.Stop();
+            chaseAudioSource.volume = startVol;
+        }
+        chaseFadeRoutine = null;
+    }
+
+    System.Collections.IEnumerator ChaseAudioLoop()
+    {
+        if (playSoundImmediatelyOnChaseStart)
+        {
+            PlayChaseNoise();
+            if (chaseAudioSource != null && chaseAudioSource.clip != null)
+            {
+                float clipDuration = chaseAudioSource.clip.length / Mathf.Max(0.1f, chaseAudioSource.pitch);
+                yield return new WaitForSeconds(clipDuration);
+            }
+        }
+
+        while (currentState == State.Chase && !hasCaught)
+        {
+            float gap = Random.Range(chaseMinInterval, chaseMaxInterval);
+            yield return new WaitForSeconds(gap);
+
+            if (currentState != State.Chase || hasCaught) break;
+
+            PlayChaseNoise();
+
+            if (chaseAudioSource != null && chaseAudioSource.clip != null)
+            {
+                float clipDuration = chaseAudioSource.clip.length / Mathf.Max(0.1f, chaseAudioSource.pitch);
+                yield return new WaitForSeconds(clipDuration);
+            }
+        }
+
+        chaseAudioRoutine = null;
+    }
+
+    void PlayChaseNoise()
+    {
+        if (chaseAudioSource == null)
+        {
+            SetupChaseAudio();
+            if (chaseAudioSource == null) return;
+        }
+
+        AudioClip clip = PickNextChaseClip();
+        if (clip == null) return;
+
+        float pitch = Random.Range(chasePitchRange.x, chasePitchRange.y);
+        chaseAudioSource.pitch = pitch;
+        chaseAudioSource.volume = chaseVolume * GameSettings.MasterVolume;
+        chaseAudioSource.clip = clip;
+        chaseAudioSource.Play();
     }
 }

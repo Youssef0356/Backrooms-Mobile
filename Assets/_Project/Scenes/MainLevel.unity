@@ -819,6 +819,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Flashlight
   startOn: 1
   intensity: 3
+  range: 24
+  lightColor: {r: 1, g: 0.95, b: 0.86, a: 1}
+  enableHandheldSway: 1
+  restingHandOffset: {x: 0.18, y: -0.16, z: 0.2}
+  rotationLagSpeed: 12
+  maxLagAngle: 20
+  armSwayMultiplier: 0.02
+  armSwayTiltAngle: 1.6
   flicker: 1
   flickerAmount: 0.15
   flickerSpeed: 12
@@ -1491,8 +1499,20 @@ MonoBehaviour:
   leadDistance: 3.5
   interceptCheckInterval: 0.35
   catchDistance: 1.5
+  headMaterial: {fileID: 0}
+  tunicMaterial: {fileID: 0}
+  pantsMaterial: {fileID: 0}
+  bootMaterial: {fileID: 0}
+  eyeMaterial: {fileID: 0}
+  handMaterial: {fileID: 0}
+  teethMaterial: {fileID: 0}
   customTurning: 1
   turnSpeed: 720
+  chaseTurnSpeed: 750
+  turnAngleThreshold: 25
+  turnExitAngleThreshold: 10
+  maxBankAngle: 4.5
+  groundOffset: -0.06
   walkAnimReferenceSpeed: 0.7
   runAnimReferenceSpeed: 1.65
   attackDistance: 2.6
@@ -1506,6 +1526,14 @@ MonoBehaviour:
   teleportSampleRadius: 3
   avoidVisibleSpots: 1
   playerSightHalfAngle: 60
+  chaseClips: []
+  chaseVolume: 0.95
+  chaseMinDistance: 2.5
+  chaseMaxDistance: 32
+  chaseMinInterval: 0.8
+  chaseMaxInterval: 2.8
+  playSoundImmediatelyOnChaseStart: 1
+  chasePitchRange: {x: 0.92, y: 1.08}
   currentState: 0
 --- !u!195 &1524290227
 NavMeshAgent:
@@ -1593,8 +1621,20 @@ MonoBehaviour:
   leadDistance: 3.5
   interceptCheckInterval: 0.35
   catchDistance: 1.5
+  headMaterial: {fileID: 0}
+  tunicMaterial: {fileID: 0}
+  pantsMaterial: {fileID: 0}
+  bootMaterial: {fileID: 0}
+  eyeMaterial: {fileID: 0}
+  handMaterial: {fileID: 0}
+  teethMaterial: {fileID: 0}
   customTurning: 1
   turnSpeed: 720
+  chaseTurnSpeed: 750
+  turnAngleThreshold: 25
+  turnExitAngleThreshold: 10
+  maxBankAngle: 4.5
+  groundOffset: -0.06
   walkAnimReferenceSpeed: 0.7
   runAnimReferenceSpeed: 1.65
   attackDistance: 2.6
@@ -1608,6 +1648,14 @@ MonoBehaviour:
   teleportSampleRadius: 3
   avoidVisibleSpots: 1
   playerSightHalfAngle: 60
+  chaseClips: []
+  chaseVolume: 0.95
+  chaseMinDistance: 2.5
+  chaseMaxDistance: 32
+  chaseMinInterval: 0.8
+  chaseMaxInterval: 2.8
+  playSoundImmediatelyOnChaseStart: 1
+  chasePitchRange: {x: 0.92, y: 1.08}
   currentState: 0
 --- !u!195 &1573173748
 NavMeshAgent:
@@ -1765,18 +1813,19 @@ MonoBehaviour:
   - {fileID: 5052889546452685368, guid: fb22e067f63eba44a83aac0f4772ce7c, type: 3}
   - {fileID: 2736415101923399538, guid: 3c58fc118b21aa445a6f61d14a18401d, type: 3}
   - {fileID: 7469728015604361222, guid: c05ed9ccff328214b9b4ebdfa8c40628, type: 3}
-  - {fileID: 8128668236925612103, guid: 95ad26daf849d884e99343be9fa4b7da, type: 3}
   - {fileID: 6753028750638749128, guid: 0b5a95f4e3d2a904a8bfd4e717e22a24, type: 3}
   - {fileID: 2706711637046184367, guid: c54be78707480a54bb9def0131fd3e1f, type: 3}
   - {fileID: 4256293016585767362, guid: cb28f4f4173226a41bd20d8c7653cb18, type: 3}
   - {fileID: 1883739933832381860, guid: 1d2831f1241c56f44a5c483eedebde6c, type: 3}
   - {fileID: 7779833873526850975, guid: 837a7171e29c1544ab3aa5002621abb3, type: 3}
-  wallDecorationPrefabs: []
+  wallDecorationPrefabs:
+  - {fileID: 7779833873526850975, guid: 837a7171e29c1544ab3aa5002621abb3, type: 3}
   decorationChance: 0.07
   maxDecorations: 45
   weirdChance: 0.4
   decorateCorridors: 1
   decorationScaleRange: {x: 0.9, y: 1.1}
+  normalizeDecorScale: 1
   floorMaterial: {fileID: 2100000, guid: 2d26abedb064e9e4d93709082bd04a66, type: 2}
   ceilingMaterial: {fileID: 2100000, guid: 83a8a8800a0daaf478bb4b6f1ce11d79, type: 2}
   wallMaterial: {fileID: 2100000, guid: a44c8b2626467ab45bc728826dd5dd38, type: 2}
@@ -2711,8 +2760,12 @@ MonoBehaviour:
   menuSceneName: Menu
   showSoundSlider: 1
   showMusicSlider: 1
+  showSensitivitySlider: 1
+  showGraphicsOption: 1
+  showFrameRateOption: 1
+  showControlsButton: 1
   showPauseButton: 1
-  pauseButtonLabel: II
+  showGuideButton: 1
   headingLabel: PAUSED
   pausedSubtitle: SIGNAL SUSPENDED
   resumeLabel: RESUME
@@ -2768,6 +2821,8 @@ MonoBehaviour:
   cameraTurnSpeed: 12
   defeatAudio: {fileID: 0}
   defeatAudioVolume: 0.9
+  defeatFadeInDuration: 0.8
+  defeatFadeOutDuration: 2.2
   menuSceneName: Menu
   headingLabel: SIGNAL TERMINATED
   subtitleLabel: ANOMALOUS ENTITY CONTACT // TRAUMATIC TERMINATION

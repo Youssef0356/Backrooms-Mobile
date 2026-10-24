@@ -238,3 +238,17 @@
     border-left-color: var(--accent);
     color: var(--accent);
 }
+
+.gameover-button--revive {
+    color: #fff6db;
+    border-left-color: #f5b027;
+    background-color: rgba(245, 176, 39, 0.14);
+    margin-bottom: 4px;
+}
+
+.gameover-button--revive:hover,
+.gameover-button--revive:focus {
+    background-color: rgba(245, 176, 39, 0.35);
+    border-left-color: #ffd166;
+    color: #ffffff;
+}

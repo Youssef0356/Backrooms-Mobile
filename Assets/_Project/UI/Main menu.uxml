@@ -68,21 +68,31 @@
                 <ui:Label name="settings-heading" class="overlay-heading" text="SETTINGS" />
                 <ui:VisualElement class="divider" picking-mode="Ignore" />
 
-                <ui:Slider name="volume-slider" class="setting-slider" label="MASTER VOLUME" low-value="0" high-value="100" value="80" />
-                <ui:Label name="volume-value" class="setting-value" text="80%" />
+                <ui:ScrollView class="settings-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden">
+                    <ui:Slider name="volume-slider" class="setting-slider" label="MASTER VOLUME" low-value="0" high-value="100" value="80" />
+                    <ui:Label name="volume-value" class="setting-value" text="80%" />
 
-                <ui:Slider name="music-slider" class="setting-slider" label="MUSIC VOLUME" low-value="0" high-value="100" value="25" />
-                <ui:Label name="music-value" class="setting-value" text="25%" />
+                    <ui:Slider name="music-slider" class="setting-slider" label="MUSIC VOLUME" low-value="0" high-value="100" value="25" />
+                    <ui:Label name="music-value" class="setting-value" text="25%" />
 
-                <ui:Slider name="sensitivity-slider" class="setting-slider" label="SENSITIVITY" low-value="10" high-value="200" value="100" />
-                <ui:Label name="sensitivity-value" class="setting-value" text="100%" />
+                    <ui:Slider name="sensitivity-slider" class="setting-slider" label="SENSITIVITY" low-value="10" high-value="200" value="100" />
+                    <ui:Label name="sensitivity-value" class="setting-value" text="100%" />
 
-                <ui:Slider name="brightness-slider" class="setting-slider" label="BRIGHTNESS" low-value="0" high-value="100" value="50" />
-                <ui:Label name="brightness-value" class="setting-value" text="50%" />
+                    <ui:Slider name="brightness-slider" class="setting-slider" label="BRIGHTNESS" low-value="0" high-value="100" value="50" />
+                    <ui:Label name="brightness-value" class="setting-value" text="50%" />
 
-                <ui:DropdownField name="graphics-dropdown" class="setting-dropdown" label="GRAPHICS" />
+                    <!-- Mobile-friendly segmented graphics quality selector -->
+                    <ui:VisualElement name="graphics-group" class="setting-group">
+                        <ui:Label class="setting-group-label" text="GRAPHICS QUALITY" />
+                        <ui:VisualElement name="graphics-selector" class="segmented-selector" />
+                    </ui:VisualElement>
 
-                <ui:DropdownField name="framerate-dropdown" class="setting-dropdown" label="TARGET FPS" />
+                    <!-- Mobile-friendly segmented target framerate selector -->
+                    <ui:VisualElement name="framerate-group" class="setting-group">
+                        <ui:Label class="setting-group-label" text="TARGET FRAMERATE" />
+                        <ui:VisualElement name="framerate-selector" class="segmented-selector" />
+                    </ui:VisualElement>
+                </ui:ScrollView>
 
                 <ui:Button name="settings-close-button" class="overlay-button" text="BACK" />
             </ui:VisualElement>

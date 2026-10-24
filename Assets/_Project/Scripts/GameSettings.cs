@@ -47,6 +47,7 @@ public static class GameSettings
     public static int TargetFrameRate => targetFrameRate;
 
     public static event System.Action<float> OnSensitivityChanged;
+    public static event System.Action<int> OnQualityChanged;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Bootstrap()
@@ -139,10 +140,40 @@ public static class GameSettings
 
     static void ApplyQuality()
     {
-        if (quality < 0) return;                       // never changed = leave as-is
         int max = QualitySettings.names.Length - 1;
         if (max < 0) return;
-        QualitySettings.SetQualityLevel(Mathf.Clamp(quality, 0, max), true);
+
+        int targetLevel = quality >= 0 ? Mathf.Clamp(quality, 0, max) : QualitySettings.GetQualityLevel();
+        QualitySettings.SetQualityLevel(targetLevel, true);
+
+        ApplyRenderScale(targetLevel);
+        OnQualityChanged?.Invoke(targetLevel);
+    }
+
+    /// <summary>
+    /// Dynamically tunes URP render scale for mobile performance without altering assets on disk:
+    /// Performance: 0.65 (60 FPS on budget devices)
+    /// Balanced:    0.75 (balanced clarity and battery)
+    /// High:        0.85 (flagship mobile clarity)
+    /// PC:          1.00 (full resolution)
+    /// </summary>
+    static void ApplyRenderScale(int qualityIndex)
+    {
+        float scale = 0.85f;
+        string currentName = qualityIndex < QualitySettings.names.Length ? QualitySettings.names[qualityIndex] : "";
+        if (currentName.IndexOf("Performance", System.StringComparison.OrdinalIgnoreCase) >= 0 || qualityIndex == 0)
+            scale = 0.65f;
+        else if (currentName.IndexOf("Balanced", System.StringComparison.OrdinalIgnoreCase) >= 0 || qualityIndex == 1)
+            scale = 0.75f;
+        else if (currentName.IndexOf("PC", System.StringComparison.OrdinalIgnoreCase) >= 0 || qualityIndex >= 3)
+            scale = 1.0f;
+        else
+            scale = 0.85f;
+
+        if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
+        {
+            urp.renderScale = scale;
+        }
     }
 
     /// Brightness is done through URP post exposure (-1..+1 EV around the 50%

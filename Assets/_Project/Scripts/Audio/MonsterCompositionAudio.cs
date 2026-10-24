@@ -219,6 +219,15 @@ public class MonsterCompositionAudio : MonoBehaviour
 
             FindVillain();
 
+            // When the monster is actively chasing the player, pause ambient spot audio
+            // so the monster's chase vocalizations take center stage and are clearly audible
+            bool isVillainChasing = (VillainAI.Instance != null && VillainAI.Instance.CurrentState == VillainAI.State.Chase);
+            if (isVillainChasing)
+            {
+                yield return new WaitForSeconds(2.0f);
+                continue;
+            }
+
             // Decide which source to play through
             AudioSource chosenSource = null;
 

@@ -69,6 +69,7 @@ public class GameOverController : MonoBehaviour
     Texture2D bloodTexture;
     Label recBadge;
     Label timeStatLabel;
+    Button reviveButton;
     Button retryButton;
     Button menuButton;
 
@@ -132,6 +133,10 @@ public class GameOverController : MonoBehaviour
         IsGameOver = true;
 
         timeSurvived = Time.timeSinceLevelLoad;
+        if (AdManager.Instance != null)
+        {
+            AdManager.Instance.RecordSurvivalTime(timeSurvived);
+        }
         OnPlayerDefeated?.Invoke();
 
         // 1. Disable player movement and look
@@ -369,6 +374,14 @@ public class GameOverController : MonoBehaviour
             timeStatLabel.text = string.Format("{0:00}:{1:00}", (int)span.TotalMinutes, span.Seconds);
         }
 
+        if (reviveButton != null)
+        {
+            bool canRevive = AdManager.Instance == null || AdManager.Instance.CanShowRevive;
+            reviveButton.style.display = canRevive ? DisplayStyle.Flex : DisplayStyle.None;
+            reviveButton.SetEnabled(true);
+            reviveButton.text = "▶ RECOVER SIGNAL (REVIVE)";
+        }
+
         if (backdrop != null)
         {
             backdrop.style.display = DisplayStyle.Flex;
@@ -376,7 +389,10 @@ public class GameOverController : MonoBehaviour
         }
 
         UnlockCursor();
-        retryButton?.Focus();
+        if (reviveButton != null && reviveButton.style.display == DisplayStyle.Flex)
+            reviveButton.Focus();
+        else
+            retryButton?.Focus();
 
         StartCoroutine(BlinkRecRoutine());
     }
@@ -395,12 +411,125 @@ public class GameOverController : MonoBehaviour
         }
     }
 
+    void OnReviveClicked()
+    {
+        if (AdManager.Instance == null)
+        {
+            ExecuteRevive();
+            return;
+        }
+
+        reviveButton.SetEnabled(false);
+        reviveButton.text = "CONNECTING BROADCAST...";
+
+        AdManager.Instance.ShowRewardedRevive(
+            onReward: () =>
+            {
+                ExecuteRevive();
+            },
+            onFailedOrSkipped: () =>
+            {
+                if (reviveButton != null)
+                {
+                    reviveButton.SetEnabled(true);
+                    reviveButton.text = "▶ RECOVER SIGNAL (FAILED - RETRY)";
+                }
+            }
+        );
+    }
+
+    public void ExecuteRevive()
+    {
+        IsGameOver = false;
+        StopAllCoroutines();
+        if (audioSource != null) audioSource.Stop();
+
+        // 1. Hide UI elements
+        if (backdrop != null)
+        {
+            backdrop.style.display = DisplayStyle.None;
+            backdrop.RemoveFromClassList("is-visible");
+        }
+        if (painFlashOverlay != null) painFlashOverlay.style.display = DisplayStyle.None;
+        if (bloodOverlay != null) bloodOverlay.style.display = DisplayStyle.None;
+
+        RestoreCursor();
+
+        // 2. Restore camera & Cinemachine
+        Camera mainCam = Camera.main;
+        if (mainCam == null) mainCam = FindAnyObjectByType<Camera>();
+        if (mainCam != null)
+        {
+            CinemachineBrain brain = mainCam.GetComponent<CinemachineBrain>();
+            if (brain != null) brain.enabled = true;
+        }
+
+        CinemachineCamera[] cineCams = FindObjectsByType<CinemachineCamera>(FindObjectsInactive.Include);
+        foreach (var c in cineCams) c.enabled = true;
+
+        // 3. Restore player controller & inputs
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            FirstPersonController fpc = player.GetComponent<FirstPersonController>();
+            if (fpc != null) fpc.enabled = true;
+
+            StarterAssetsInputs inputs = player.GetComponent<StarterAssetsInputs>();
+            if (inputs != null)
+            {
+                inputs.MoveInput(Vector2.zero);
+                inputs.LookInput(Vector2.zero);
+                inputs.JumpInput(false);
+                inputs.SprintInput(false);
+            }
+        }
+
+        // 4. Restore touch controls (if on touch platform)
+        bool isTouch = Application.isMobilePlatform || Input.touchSupported;
+        if (isTouch)
+        {
+            TouchscreenInput touchUI = FindAnyObjectByType<TouchscreenInput>(FindObjectsInactive.Include);
+            if (touchUI != null) touchUI.gameObject.SetActive(true);
+            GameObject touchGo = GameObject.Find("UI_TouchScreenInput");
+            if (touchGo != null) touchGo.SetActive(true);
+        }
+
+        // 5. Reposition and calm monster
+        VillainAI villain = VillainAI.Instance != null ? VillainAI.Instance : FindAnyObjectByType<VillainAI>();
+        if (villain != null)
+        {
+            villain.ResetAfterRevive(6f);
+        }
+
+        // 6. Play recover audio sting / effect
+        AudioClip recoverClip = Resources.Load<AudioClip>("SFX/juanjo_ sound - elevated");
+        if (recoverClip != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(recoverClip, 0.85f);
+        }
+
+        // 7. VHS tape glitch burst to indicate signal recovery
+        CameraVHSGlitch.TriggerKillBurst();
+    }
+
     void OnRetryClicked()
     {
         IsGameOver = false;
         Time.timeScale = 1f;
         RestoreCursor();
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+
+        if (AdManager.Instance != null)
+        {
+            AdManager.Instance.TryShowInterstitial(() =>
+            {
+                AdManager.Instance.ResetRunState();
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            });
+        }
+        else
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
     }
 
     void OnMenuClicked()
@@ -409,10 +538,23 @@ public class GameOverController : MonoBehaviour
         Time.timeScale = 1f;
         RestoreCursor();
 
-        if (Application.CanStreamedLevelBeLoaded(menuSceneName))
-            SceneManager.LoadScene(menuSceneName);
+        Action loadMenu = () =>
+        {
+            if (AdManager.Instance != null) AdManager.Instance.ResetRunState();
+            if (Application.CanStreamedLevelBeLoaded(menuSceneName))
+                SceneManager.LoadScene(menuSceneName);
+            else
+                SceneManager.LoadScene(0);
+        };
+
+        if (AdManager.Instance != null)
+        {
+            AdManager.Instance.TryShowInterstitial(loadMenu);
+        }
         else
-            SceneManager.LoadScene(0);
+        {
+            loadMenu();
+        }
     }
 
     void HideMobileControls()
@@ -596,6 +738,10 @@ public class GameOverController : MonoBehaviour
         statsBox.Add(timeRow);
 
         // Buttons
+        reviveButton = MakeButton("▶ RECOVER SIGNAL (REVIVE)", OnReviveClicked);
+        reviveButton.AddToClassList("gameover-button--revive");
+        card.Add(reviveButton);
+
         retryButton = MakeButton(retryButtonLabel, OnRetryClicked);
         card.Add(retryButton);
 

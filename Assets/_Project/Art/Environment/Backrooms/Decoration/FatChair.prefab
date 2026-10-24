@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 6069130851809109062}
   - component: {fileID: 8592486601758802904}
   - component: {fileID: 581836076687515012}
-  - component: {fileID: 6699734429042796920}
   m_Layer: 0
   m_Name: Object_6
   m_TagString: Untagged
@@ -91,27 +90,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &6699734429042796920
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6377453218895950308}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.1560698, y: 3.9076977, z: 4.8677206}
-  m_Center: {x: -6.9592347, y: -33.42135, z: 2.4338598}
 --- !u!1 &6753028750638749128
 GameObject:
   m_ObjectHideFlags: 0
@@ -121,6 +99,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 108307398150131325}
+  - component: {fileID: 88188757272085412}
   m_Layer: 0
   m_Name: FatChair
   m_TagString: Untagged
@@ -144,3 +123,24 @@ Transform:
   - {fileID: 6069130851809109062}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &88188757272085412
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6753028750638749128}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.1560698, y: 4.867722, z: 3.9076989}
+  m_Center: {x: 0.0000006108186, y: 2.433861, z: 0}

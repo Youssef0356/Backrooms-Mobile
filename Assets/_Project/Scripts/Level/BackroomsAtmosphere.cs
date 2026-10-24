@@ -48,6 +48,21 @@ public class BackroomsAtmosphere : MonoBehaviour
 
     Volume volume;
 
+    void OnEnable()
+    {
+        GameSettings.OnQualityChanged += HandleQualityChanged;
+    }
+
+    void OnDisable()
+    {
+        GameSettings.OnQualityChanged -= HandleQualityChanged;
+    }
+
+    void HandleQualityChanged(int q)
+    {
+        ApplyQualitySettings(q);
+    }
+
     void Awake()
     {
         ApplyFog();
@@ -58,6 +73,7 @@ public class BackroomsAtmosphere : MonoBehaviour
     {
         ApplyCamera();
         BuildVolume();
+        ApplyQualitySettings(GameSettings.QualityLevel);
     }
 
     void ApplyFog()
@@ -156,5 +172,52 @@ public class BackroomsAtmosphere : MonoBehaviour
         volume.priority = 100f;
         volume.weight = 1f;
         volume.profile = profile;
+
+        ApplyQualitySettings(GameSettings.QualityLevel);
+    }
+
+    /// <summary>
+    /// Throttles heavy post-processing effects based on the selected graphics tier:
+    /// - Low / Performance: Skips procedural film grain, chromatic aberration, bloom, and FXAA.
+    /// - Balanced: Keeps subtle bloom, skips heavy film grain and chromatic aberration.
+    /// - High / PC: Full authentic atmosphere profile.
+    /// </summary>
+    void ApplyQualitySettings(int qualityIndex)
+    {
+        if (volume == null || volume.profile == null) return;
+        VolumeProfile prof = volume.profile;
+
+        bool isLow = qualityIndex == 0;
+        bool isMedium = qualityIndex == 1;
+
+        if (prof.TryGet(out Bloom bloom))
+        {
+            if (isLow) bloom.intensity.Override(0f);
+            else if (isMedium) bloom.intensity.Override(bloomIntensity * 0.7f);
+            else bloom.intensity.Override(bloomIntensity);
+        }
+
+        if (prof.TryGet(out FilmGrain grain))
+        {
+            if (isLow || isMedium) grain.intensity.Override(0f);
+            else grain.intensity.Override(grainIntensity);
+        }
+
+        if (prof.TryGet(out ChromaticAberration aberration))
+        {
+            if (isLow) aberration.intensity.Override(0f);
+            else aberration.intensity.Override(chromaticAberration);
+        }
+
+        Camera cam = Camera.main;
+        if (cam == null) cam = FindAnyObjectByType<Camera>();
+        if (cam != null)
+        {
+            UniversalAdditionalCameraData data = cam.GetUniversalAdditionalCameraData();
+            if (data != null)
+            {
+                data.antialiasing = isLow ? AntialiasingMode.None : AntialiasingMode.FastApproximateAntialiasing;
+            }
+        }
     }
 }

@@ -294,18 +294,28 @@
 }
 
 .overlay-card {
-    width: 660px;
-    padding-top: 32px;
-    padding-bottom: 32px;
-    padding-left: 40px;
-    padding-right: 40px;
+    width: 740px;
+    max-width: 92%;
+    max-height: 92%;
+    padding-top: 28px;
+    padding-bottom: 28px;
+    padding-left: 36px;
+    padding-right: 36px;
     background-color: var(--panel);
     border-left-width: 1px;
     border-right-width: 1px;
     border-top-width: 1px;
     border-bottom-width: 1px;
     border-color: var(--line);
+    border-radius: 6px;
     flex-direction: column;
+}
+
+.settings-scroll {
+    flex-grow: 1;
+    max-height: 480px;
+    margin-top: 6px;
+    margin-bottom: 6px;
 }
 
 .overlay-heading {
@@ -317,9 +327,9 @@
 }
 
 .menu-root .overlay-button {
-    margin-top: 28px;
-    height: 64px;
-    font-size: 26px;
+    margin-top: 16px;
+    height: 58px;
+    font-size: 24px;
     letter-spacing: 6px;
     -unity-font-style: bold;
     color: var(--text);
@@ -352,21 +362,74 @@
 
 .setting-slider {
     width: 100%;
-    margin-top: 16px;
+    margin-top: 14px;
 }
 
 .setting-slider .unity-base-field__label {
-    font-size: 17px;
+    font-size: 19px;
     letter-spacing: 3px;
     color: var(--text);
 }
 
 .setting-value {
     margin-top: 2px;
-    font-size: 16px;
+    font-size: 18px;
     letter-spacing: 3px;
     color: var(--accent);
     -unity-text-align: upper-right;
+}
+
+/* mobile-friendly segmented button selectors */
+.setting-group {
+    margin-top: 16px;
+    width: 100%;
+}
+
+.setting-group-label {
+    font-size: 19px;
+    letter-spacing: 3px;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.segmented-selector {
+    flex-direction: row;
+    width: 100%;
+    gap: 8px;
+}
+
+.segmented-pill {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 48px;
+    background-color: rgba(223, 216, 118, 0.06);
+    background-image: none;
+    border-width: 1px;
+    border-color: rgba(223, 216, 118, 0.25);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 16px;
+    letter-spacing: 2px;
+    -unity-text-align: middle-center;
+    padding-left: 4px;
+    padding-right: 4px;
+    transition-property: background-color, border-color, color;
+    transition-duration: 0.12s;
+}
+
+.segmented-pill:hover,
+.segmented-pill:focus {
+    background-color: rgba(223, 216, 118, 0.16);
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.segmented-pill.is-pill-active {
+    background-color: rgba(223, 216, 118, 0.28);
+    border-color: var(--accent);
+    border-width: 2px;
+    color: var(--accent);
+    -unity-font-style: bold;
 }
 
 /* graphics dropdown, styled to match the slider rows */
@@ -415,24 +478,24 @@
 /* tint the default runtime theme slider to match the palette */
 .setting-slider .unity-base-slider__tracker {
     background-color: rgba(223, 216, 118, 0.16);
-    height: 6px;
+    height: 8px;
 }
 
 .setting-slider .unity-base-slider__dragger {
-    width: 24px;
-    height: 32px;
+    width: 28px;
+    height: 36px;
     background-color: var(--accent);
     border-width: 0;
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 .setting-slider .unity-base-slider__dragger-border {
-    width: 26px;
-    height: 34px;
+    width: 30px;
+    height: 38px;
     border-width: 1px;
     border-color: rgba(223, 216, 118, 0.55);
     background-color: rgba(0, 0, 0, 0);
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 /* ============================== controls =================================== */

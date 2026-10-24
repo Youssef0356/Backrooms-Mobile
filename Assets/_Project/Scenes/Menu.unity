@@ -431,7 +431,6 @@ GameObject:
   - component: {fileID: 859119188}
   - component: {fileID: 859119190}
   - component: {fileID: 859119191}
-  - component: {fileID: 859119192}
   m_Layer: 5
   m_Name: UIDocument
   m_TagString: Untagged
@@ -457,7 +456,7 @@ MonoBehaviour:
   m_SortingOrder: 0
   m_Position: 0
   m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 2340
+  m_WorldSpaceWidth: 2339.9998
   m_WorldSpaceHeight: 1080
   m_PivotReferenceSize: 1
   m_Pivot: 0
@@ -472,7 +471,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 1.5}
-  m_LocalScale: {x: 0.16037507, y: 0.16037507, z: 1}
+  m_LocalScale: {x: 0.16197856, y: 0.16197854, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 394578810}
@@ -513,64 +512,6 @@ MonoBehaviour:
   flickerEffect: 1
   fadeOutDuration: 0.35
   levelSoundtrackName: backrooms level0
---- !u!1931382934 &859119192
-PanelRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 859119187}
-  m_Enabled: 1
-  m_CastShadows: 0
-  m_ReceiveShadows: 0
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 0
-  m_ReflectionProbeUsage: 0
-  m_RayTracingMode: 0
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  serializedVersion: 1
-  m_PanelSettings: {fileID: 11400000, guid: b7c1f4a2e5d94c3fa8d1e6b2c9f04715, type: 2}
-  sourceAsset: {fileID: 9197481963319205126, guid: e906c53286151344bae159fb4f6e1346, type: 3}
-  m_ParentUI: {fileID: 0}
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 2340
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 1
-  m_Pivot: 0
-  m_Position: 0
 --- !u!1 &1068929378
 GameObject:
   m_ObjectHideFlags: 0

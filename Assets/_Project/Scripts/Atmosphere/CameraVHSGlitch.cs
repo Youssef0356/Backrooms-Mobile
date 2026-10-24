@@ -72,6 +72,31 @@ public class CameraVHSGlitch : MonoBehaviour
         SetupStaticAudio();
     }
 
+    void OnEnable()
+    {
+        GameSettings.OnQualityChanged += HandleQualityChanged;
+        ApplyQualitySettings(GameSettings.QualityLevel);
+    }
+
+    void OnDisable()
+    {
+        GameSettings.OnQualityChanged -= HandleQualityChanged;
+    }
+
+    void HandleQualityChanged(int q)
+    {
+        ApplyQualitySettings(q);
+    }
+
+    void ApplyQualitySettings(int qualityIndex)
+    {
+        bool isLow = qualityIndex == 0;
+        if (glitchOverlay != null)
+        {
+            glitchOverlay.gameObject.SetActive(!isLow);
+        }
+    }
+
     /// <summary>
     /// Spikes maximum glitch, chromatic aberration and static for jumpscare sequences.
     /// </summary>

@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 2064821102049845571}
   - component: {fileID: 5557850708055804564}
   - component: {fileID: 1290741041086446116}
-  - component: {fileID: 374782228369185940}
   m_Layer: 0
   m_Name: Object_10
   m_TagString: Untagged
@@ -91,27 +90,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &374782228369185940
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1170003668761013592}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 3.82645, y: 3.5807, z: 3.8389301}
-  m_Center: {x: -0.77662504, y: -33.050247, z: 3.1821852}
 --- !u!1 &2706711637046184367
 GameObject:
   m_ObjectHideFlags: 0
@@ -121,6 +99,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 809490191054024}
+  - component: {fileID: 6616446822741121802}
   m_Layer: 0
   m_Name: ChairWithWheels
   m_TagString: Untagged
@@ -145,6 +124,27 @@ Transform:
   - {fileID: 2064821102049845571}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &6616446822741121802
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2706711637046184367}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 3.82645, y: 5.1016507, z: 3.5807006}
+  m_Center: {x: 0, y: 2.5508254, z: -0.0000025606914}
 --- !u!1 &4261165896773391796
 GameObject:
   m_ObjectHideFlags: 0
@@ -156,7 +156,6 @@ GameObject:
   - component: {fileID: 7006449261181157280}
   - component: {fileID: 1986727478459671214}
   - component: {fileID: 3305352431375204258}
-  - component: {fileID: 3988200287031025984}
   m_Layer: 0
   m_Name: Object_7
   m_TagString: Untagged
@@ -236,24 +235,3 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &3988200287031025984
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4261165896773391796}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 3.324866, y: 3.2098007, z: 1.26281}
-  m_Center: {x: -0.764727, y: -33.0498, z: 0.631405}

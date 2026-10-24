@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 9085558088008095291}
   - component: {fileID: 8251576800287686561}
   - component: {fileID: 6903040741316777142}
-  - component: {fileID: 5103460889018253655}
   m_Layer: 0
   m_Name: Object_14
   m_TagString: Untagged
@@ -91,27 +90,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &5103460889018253655
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 116200639311677295}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 12.779499, y: 6.256201, z: 5.8651695}
-  m_Center: {x: 39.610252, y: -32.4095, z: 2.9325852}
 --- !u!1 &1883739933832381860
 GameObject:
   m_ObjectHideFlags: 0
@@ -121,6 +99,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 377147744992256040}
+  - component: {fileID: 2357140350743697576}
   m_Layer: 0
   m_Name: "Canap\xE9"
   m_TagString: Untagged
@@ -144,3 +123,24 @@ Transform:
   - {fileID: 9085558088008095291}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2357140350743697576
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1883739933832381860}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 12.779499, y: 5.865171, z: 6.256202}
+  m_Center: {x: 0, y: 2.9325857, z: 0}

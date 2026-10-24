@@ -56,21 +56,80 @@ public class BackroomsExitZone : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
+        TryTriggerVictory(other);
+    }
+
+    void OnTriggerStay(Collider other)
+    {
+        TryTriggerVictory(other);
+    }
+
+    void TryTriggerVictory(Collider other)
+    {
         if (triggered) return;
 
-        bool isPlayer = other.CompareTag(playerTag) ||
-                        other.GetComponent<CharacterController>() != null ||
-                        other.GetComponentInParent<StarterAssets.ThirdPersonController>() != null;
-
-        if (isPlayer)
+        Transform playerRoot = null;
+        if (other.CompareTag(playerTag))
         {
-            triggered = true;
-            if (audioSource != null && audioSource.isPlaying)
-            {
-                audioSource.Stop();
-            }
-            VictoryController.TriggerVictory();
+            playerRoot = other.transform;
         }
+        else
+        {
+            CharacterController cc = other.GetComponent<CharacterController>() ?? other.GetComponentInParent<CharacterController>();
+            if (cc != null)
+            {
+                playerRoot = cc.transform;
+            }
+            else
+            {
+                var tpc = other.GetComponentInParent<StarterAssets.ThirdPersonController>();
+                if (tpc != null) playerRoot = tpc.transform;
+            }
+        }
+
+        if (playerRoot == null) return;
+
+        // 1. Position check in doorway local space:
+        // Ensures player is actually walking through the front of the doorway opening,
+        // never from behind the wall or merely brushing by an adjacent hallway.
+        Vector3 localPos = transform.InverseTransformPoint(playerRoot.position);
+
+        // Width opening between left and right posts (posts at +-0.85m)
+        if (Mathf.Abs(localPos.x) > 0.85f) return;
+        // Height check (doorway opening is 2.45m high)
+        if (localPos.y < -0.3f || localPos.y > 2.5f) return;
+        // Depth check: entering from room front (-Z) through threshold (+0.1m).
+        // Must NOT be behind the wall (localPos.z > 0.25m).
+        if (localPos.z > 0.25f || localPos.z < -0.85f) return;
+
+        // 2. Line of sight check: verify no solid wall separates the doorway center from the player.
+        // This guarantees that approaching the door from behind a partition wall will never trigger escape.
+        Vector3 doorwayThresholdWorld = transform.TransformPoint(new Vector3(0f, 1.2f, -0.15f));
+        Vector3 playerCenterWorld = playerRoot.position + Vector3.up * 1.0f;
+        Vector3 dir = playerCenterWorld - doorwayThresholdWorld;
+        float dist = dir.magnitude;
+
+        if (dist > 0.05f)
+        {
+            if (Physics.Raycast(doorwayThresholdWorld, dir.normalized, out RaycastHit hit, dist, ~0, QueryTriggerInteraction.Ignore))
+            {
+                bool hitIsPlayer = hit.transform == playerRoot ||
+                                   hit.transform.IsChildOf(playerRoot) ||
+                                   playerRoot.IsChildOf(hit.transform);
+                if (!hitIsPlayer)
+                {
+                    // Hit a wall or obstacle between the door and player; ignore trigger
+                    return;
+                }
+            }
+        }
+
+        triggered = true;
+        if (audioSource != null && audioSource.isPlaying)
+        {
+            audioSource.Stop();
+        }
+        VictoryController.TriggerVictory();
     }
 
     /// <summary>
@@ -82,11 +141,11 @@ public class BackroomsExitZone : MonoBehaviour
         exitObj.transform.position = position;
         exitObj.transform.rotation = rotation;
 
-        // Trigger Collider
+        // Trigger Collider: tightly scoped to the doorway opening so it never extends through back walls
         BoxCollider box = exitObj.AddComponent<BoxCollider>();
         box.isTrigger = true;
-        box.size = new Vector3(2.4f, 2.8f, 2.4f);
-        box.center = new Vector3(0f, 1.4f, 0f);
+        box.size = new Vector3(1.5f, 2.3f, 0.7f);
+        box.center = new Vector3(0f, 1.15f, -0.15f);
 
         exitObj.AddComponent<BackroomsExitZone>();
 

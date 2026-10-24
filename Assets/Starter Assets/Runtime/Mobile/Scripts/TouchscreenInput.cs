@@ -19,6 +19,8 @@ namespace StarterAssets
         [Range(0.1f, 3.0f)]
         public float TouchSensitivity = 1.0f;
         public bool InvertLookY;
+        [Tooltip("Force touch controls to show on desktop platforms (e.g. for testing in editor)")]
+        public bool forceShowTouchControls = false;
 
         [Header("Events")]
         public UnityEvent<Vector2> MoveEvent;
@@ -59,6 +61,17 @@ namespace StarterAssets
         private void Awake()
         {
             m_Document = GetComponent<UIDocument>();
+
+            bool isTouchPlatform = Application.isMobilePlatform || Input.touchSupported || forceShowTouchControls;
+            if (!isTouchPlatform)
+            {
+                if (m_Document != null && m_Document.rootVisualElement != null)
+                {
+                    m_Document.rootVisualElement.style.display = DisplayStyle.None;
+                }
+                enabled = false;
+                return;
+            }
 
             TouchSensitivity = Mathf.Clamp(PlayerPrefs.GetFloat("backrooms.sensitivity", 1f), 0.1f, 2f);
 
@@ -256,9 +269,9 @@ namespace StarterAssets
             {
                 if (m_HasLookDelta)
                 {
-                    // Direct swipe delta: degrees proportional to pixels dragged
-                    float lookX = m_AccumulatedLookDelta.x * (TouchSensitivity * 0.12f);
-                    float lookY = -m_AccumulatedLookDelta.y * (TouchSensitivity * 0.12f);
+                    // Direct swipe delta: degrees proportional to pixels dragged (sensitivity is cleanly handled by FirstPersonController)
+                    float lookX = m_AccumulatedLookDelta.x * 0.12f;
+                    float lookY = -m_AccumulatedLookDelta.y * 0.12f;
 
                     if (InvertLookY)
                         lookY = -lookY;

@@ -60,6 +60,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
     [Range(0f, 1f)] public float weirdChance = 0.4f;        // chance a prop is placed in an impossible way
     public bool decorateCorridors = true;
     public Vector2 decorationScaleRange = new Vector2(0.9f, 1.1f);
+    [Tooltip("Automatically normalizes all decor prefabs to realistic Backrooms human scale (chairs ~0.92m, sofas ~0.82m x ~1.9m, tables ~0.75m) regardless of raw 3D model scale offsets.")]
+    public bool normalizeDecorScale = true;
 
     [Header("Materials (used when no prefab is assigned)")]
     public Material floorMaterial;
@@ -93,6 +95,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
     bool[,] roomCell;
     readonly List<RectInt> rooms = new List<RectInt>();
     Transform root;
+    Vector2Int reservedExitCell = new Vector2Int(-99, -99);
 
     void Start()
     {
@@ -118,6 +121,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         floor = new bool[gridWidth, gridHeight];
         roomCell = new bool[gridWidth, gridHeight];
         rooms.Clear();
+        reservedExitCell = new Vector2Int(-99, -99);
 
         PlaceRooms();
         ConnectRooms();
@@ -128,6 +132,9 @@ public class BackroomsRoomGenerator : MonoBehaviour
         BuildLights();
 
         CombineGeneratedMeshes();
+
+        // Reserve exit spot and its clearance zone before placing props
+        ReserveExitSpot();
 
         BuildDecorations();
 
@@ -146,6 +153,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         EnsureVHSGlitch();
         EnsureGameOverSystem();
         EnsureVictorySystem();
+        EnsureSurvivalDialogueHUD();
         EnsurePlayerMotion();
         EnsureMonsterCompositionAudio();
     }
@@ -455,7 +463,11 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
         if (lightPrefab == null && !panelLights) return;
 
-        int stride = Mathf.Max(1, Mathf.CeilToInt(cells.Count / (float)Mathf.Max(1, maxPanelLights)));
+        int effectiveMaxLights = maxPanelLights;
+        if (GameSettings.QualityLevel == 0) effectiveMaxLights = Mathf.Min(maxPanelLights, 8);
+        else if (GameSettings.QualityLevel == 1) effectiveMaxLights = Mathf.Min(maxPanelLights, 16);
+
+        int stride = Mathf.Max(1, Mathf.CeilToInt(cells.Count / (float)Mathf.Max(1, effectiveMaxLights)));
 
         for (int i = 0; i < cells.Count; i += stride)
         {
@@ -546,6 +558,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
                 if (!floor[x, z]) continue;
                 if (!decorateCorridors && !roomCell[x, z]) continue;
                 if (Mathf.Abs(spawnCell.x - x) <= 1 && Mathf.Abs(spawnCell.y - z) <= 1) continue;
+                // Keep the exit door area completely clear of furniture props
+                if (reservedExitCell.x >= 0 && Mathf.Abs(reservedExitCell.x - x) <= 2 && Mathf.Abs(reservedExitCell.y - z) <= 2) continue;
                 cells.Add(new Vector2Int(x, z));
             }
         }
@@ -575,6 +589,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
                 : decorationPrefabs[Random.Range(0, decorationPrefabs.Length)];
 
             if (prefab == null) continue;
+            // Never spawn raw multi-model GLB asset packs if accidentally dragged into prefab array
+            if (prefab.name.ToLowerInvariant().Contains("furniture_pack")) continue;
 
             SpawnDecoration(prefab, c, side, useWallSet, dx, dz);
             placed++;
@@ -594,9 +610,15 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
     void SpawnDecoration(GameObject prefab, Vector2Int cell, int side, bool forceWallItem, int[] dx, int[] dz)
     {
+        if (prefab == null) return;
+        if (prefab.name.ToLowerInvariant().Contains("furniture_pack")) return;
+
         // Clean wrapper so the prop pivot is always centered regardless of original 3D model pivot offsets
         GameObject wrapper = new GameObject(prefab.name);
         wrapper.transform.SetParent(root, false);
+        wrapper.transform.position = Vector3.zero;
+        wrapper.transform.rotation = Quaternion.identity;
+        wrapper.transform.localScale = Vector3.one;
 
         GameObject g = Instantiate(prefab, wrapper.transform, false);
         g.transform.localPosition = Vector3.zero;
@@ -605,23 +627,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
         // Shift inner object so that the wrapper pivot is exactly at the bottom-center of the visual mesh
         Bounds b = GetBounds(g);
         Vector3 bottomCenter = new Vector3(b.center.x, b.min.y, b.center.z);
-        g.transform.position -= bottomCenter;
+        g.transform.localPosition -= bottomCenter;
 
-        // Apply prefab local scale modulated by random variance
-        wrapper.transform.localScale = prefab.transform.localScale *
-                                       Random.Range(decorationScaleRange.x, decorationScaleRange.y);
-
-        // Sanity check: keep props at believable Backrooms scale (fit within 2.5m corridors, not microscopic)
-        Bounds finalB = GetBounds(wrapper);
-        float maxDim = Mathf.Max(finalB.size.x, Mathf.Max(finalB.size.y, finalB.size.z));
-        if (maxDim > 2.2f && !forceWallItem && !IsFlatWallProp(wrapper))
-        {
-            wrapper.transform.localScale *= (1.8f / maxDim);
-        }
-        else if (maxDim < 0.25f && maxDim > 0.001f)
-        {
-            wrapper.transform.localScale *= (0.6f / maxDim);
-        }
+        // Compute normalized human-scale multiplier to make chairs, sofas, tables believable
+        float normScale = ComputePropScaleMultiplier(prefab.name, b, forceWallItem);
+        float variance = Random.Range(decorationScaleRange.x, decorationScaleRange.y);
+        wrapper.transform.localScale = Vector3.one * (normScale * variance);
 
         bool wallItem = forceWallItem || IsFlatWallProp(wrapper);
         bool weird = Random.value < weirdChance;
@@ -650,13 +661,113 @@ public class BackroomsRoomGenerator : MonoBehaviour
         FinishDecoration(wrapper);
     }
 
-    /// A prop much thinner than it is wide reads as a poster / picture / sign.
+    /// <summary>
+    /// Computes a uniform scaling multiplier to normalize any decor prefab to realistic Backrooms human scale (meters).
+    /// Prevents huge chairs (2m+), microscopic sofas (0.2m), or oversized tables that block hallways.
+    /// </summary>
+    float ComputePropScaleMultiplier(string propName, Bounds bounds, bool isWallItem)
+    {
+        if (!normalizeDecorScale) return 1.0f;
+
+        float currentHeight = bounds.size.y;
+        float currentWidth = bounds.size.x;
+        float currentDepth = bounds.size.z;
+        float maxHoriz = Mathf.Max(currentWidth, currentDepth);
+        float maxDim = Mathf.Max(currentHeight, maxHoriz);
+
+        if (currentHeight <= 0.001f || maxDim <= 0.001f)
+            return 1.0f;
+
+        string lower = propName.ToLowerInvariant();
+        float multiplier = 1.0f;
+
+        if (lower.Contains("chair") || lower.Contains("seat") || lower.Contains("stool"))
+        {
+            // Human-sized office / arm / lounge chairs: ~0.90m - 0.95m tall (backrest)
+            float targetHeight = 0.92f;
+            multiplier = targetHeight / currentHeight;
+
+            // Ensure chair width/depth stays within 0.55m - 0.80m
+            float scaledHoriz = maxHoriz * multiplier;
+            if (scaledHoriz > 0.85f)
+                multiplier *= (0.80f / scaledHoriz);
+        }
+        else if (lower.Contains("canape") || lower.Contains("canapé") || lower.Contains("sofa") || lower.Contains("couch"))
+        {
+            // Human-sized sofa: ~0.82m backrest height, ~1.85m - 2.05m length
+            float targetHeight = 0.82f;
+            multiplier = targetHeight / currentHeight;
+
+            float scaledLength = maxHoriz * multiplier;
+            // Keep sofa length between 1.6m and 2.1m so it fits corridors and rooms believably
+            if (scaledLength > 2.15f)
+                multiplier *= (2.05f / scaledLength);
+            else if (scaledLength < 1.4f && maxHoriz > 0.001f)
+                multiplier = 1.85f / maxHoriz;
+        }
+        else if (lower.Contains("table") || lower.Contains("desk"))
+        {
+            // Standard desk height is ~0.74m - 0.76m
+            float targetHeight = 0.75f;
+            multiplier = targetHeight / currentHeight;
+
+            float scaledLength = maxHoriz * multiplier;
+            // Cap table length at 1.8m so it leaves ample walking room in 2.5m - 3.0m corridors
+            if (scaledLength > 1.85f)
+                multiplier *= (1.80f / scaledLength);
+        }
+        else if (lower.Contains("tv") || lower.Contains("television") || lower.Contains("monitor"))
+        {
+            // CRT TV / monitor: ~0.55m height
+            float targetHeight = 0.55f;
+            multiplier = targetHeight / currentHeight;
+        }
+        else if (lower.Contains("suitcase") || lower.Contains("valise") || lower.Contains("luggage") || lower.Contains("box"))
+        {
+            // Briefcase / luggage: max dimension ~0.45m - 0.55m
+            multiplier = 0.50f / maxDim;
+        }
+        else if (lower.Contains("sign") || lower.Contains("poster") || lower.Contains("picture") || isWallItem)
+        {
+            // Wall / road sign: target height ~1.95m for road signs, ~1.10m for wall posters
+            float targetHeight = lower.Contains("road") ? 1.95f : 1.10f;
+            multiplier = targetHeight / currentHeight;
+        }
+        else
+        {
+            // General unknown prop fallback:
+            // Ensure height doesn't exceed 1.2m and horizontal doesn't exceed 1.6m
+            if (currentHeight > 1.3f)
+                multiplier = 1.0f / currentHeight;
+            else if (maxHoriz > 1.8f)
+                multiplier = 1.5f / maxHoriz;
+            else if (maxDim < 0.3f)
+                multiplier = 0.6f / maxDim;
+        }
+
+        return multiplier;
+    }
+
+    /// <summary>
+    /// Checks whether a prop should be mounted on a wall.
+    /// Distinguishes true wall decor (signs, posters) from floor furniture (chairs, sofas, suitcases).
+    /// </summary>
     bool IsFlatWallProp(GameObject g)
     {
+        string lower = g.name.ToLowerInvariant();
+        if (lower.Contains("poster") || lower.Contains("sign") || lower.Contains("picture") || lower.Contains("frame") || lower.Contains("board"))
+            return true;
+
+        // Furniture props must never be automatically treated as flat posters
+        if (lower.Contains("chair") || lower.Contains("sofa") || lower.Contains("canape") || lower.Contains("canapé") ||
+            lower.Contains("table") || lower.Contains("desk") || lower.Contains("tv") || lower.Contains("suitcase"))
+            return false;
+
         Bounds b = GetBounds(g);
         float min = Mathf.Min(b.size.x, Mathf.Min(b.size.y, b.size.z));
         float max = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
-        return max > 0.001f && min / max < 0.35f;
+        // Razor-thin items (thickness < 15cm) with high aspect ratio
+        return min < 0.15f && max > 0.4f && (min / max) < 0.18f;
     }
 
     /// Normal wall mounting: flush, upright, at believable picture height, with
@@ -768,51 +879,50 @@ public class BackroomsRoomGenerator : MonoBehaviour
         }
     }
 
-    /// Automatically generates solid box colliders for all renderers in a prop if missing,
-    /// preventing the player from clipping / walking through furniture.
+    /// Ensures the prop has solid colliders, preventing the player from clipping through furniture
+    /// while strictly avoiding BoxColliders on negatively scaled transforms (which PhysX rejects).
     void EnsurePropColliders(GameObject g)
     {
+        // 1. Guard against any BoxCollider on a negatively scaled child transform (common in mirrored 3D models)
+        BoxCollider[] boxes = g.GetComponentsInChildren<BoxCollider>(true);
+        foreach (BoxCollider box in boxes)
+        {
+            Vector3 ls = box.transform.lossyScale;
+            if (ls.x < 0f || ls.y < 0f || ls.z < 0f)
+            {
+                MeshFilter mf = box.GetComponent<MeshFilter>();
+                Mesh sharedMesh = mf != null ? mf.sharedMesh : null;
+                Destroy(box);
+                if (sharedMesh != null)
+                {
+                    MeshCollider mc = box.gameObject.AddComponent<MeshCollider>();
+                    mc.convex = true;
+                    mc.sharedMesh = sharedMesh;
+                }
+            }
+        }
+
+        // 2. If the prop already has at least one valid collider, nothing more needed
         Collider[] existing = g.GetComponentsInChildren<Collider>();
         if (existing != null && existing.Length > 0) return;
 
+        // 3. Otherwise add a single clean BoxCollider to the root wrapper
         Renderer[] renderers = g.GetComponentsInChildren<Renderer>();
         if (renderers == null || renderers.Length == 0) return;
 
-        foreach (Renderer r in renderers)
-        {
-            if (r.GetComponent<Collider>() != null) continue;
+        Bounds b = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+            b.Encapsulate(renderers[i].bounds);
 
-            Vector3 ls = r.transform.lossyScale;
-            bool hasNegativeScale = ls.x < 0f || ls.y < 0f || ls.z < 0f;
-
-            MeshFilter mf = r.GetComponent<MeshFilter>();
-            SkinnedMeshRenderer smr = r as SkinnedMeshRenderer;
-
-            if (hasNegativeScale)
-            {
-                Mesh sharedMesh = mf != null ? mf.sharedMesh : (smr != null ? smr.sharedMesh : null);
-                if (sharedMesh != null)
-                {
-                    MeshCollider mc = r.gameObject.AddComponent<MeshCollider>();
-                    mc.convex = true;
-                    mc.sharedMesh = sharedMesh;
-                    continue;
-                }
-            }
-
-            if (mf != null && mf.sharedMesh != null)
-            {
-                BoxCollider bc = r.gameObject.AddComponent<BoxCollider>();
-                bc.center = mf.sharedMesh.bounds.center;
-                bc.size = mf.sharedMesh.bounds.size;
-            }
-            else
-            {
-                BoxCollider bc = r.gameObject.AddComponent<BoxCollider>();
-                bc.center = r.localBounds.center;
-                bc.size = r.localBounds.size;
-            }
-        }
+        BoxCollider bc = g.AddComponent<BoxCollider>();
+        bc.center = g.transform.InverseTransformPoint(b.center);
+        Vector3 worldSize = b.size;
+        Vector3 scale = g.transform.lossyScale;
+        bc.size = new Vector3(
+            scale.x != 0 ? Mathf.Abs(worldSize.x / scale.x) : worldSize.x,
+            scale.y != 0 ? Mathf.Abs(worldSize.y / scale.y) : worldSize.y,
+            scale.z != 0 ? Mathf.Abs(worldSize.z / scale.z) : worldSize.z
+        );
     }
 
     // ---------------- Helpers ----------------
@@ -824,7 +934,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
         MeshFilter[] filters = root.GetComponentsInChildren<MeshFilter>();
         if (filters == null || filters.Length == 0) return;
 
-        Dictionary<Material, List<CombineInstance>> batches = new Dictionary<Material, List<CombineInstance>>();
+        const int chunkSizeCells = 10;
+        float chunkWorldSize = Mathf.Max(1f, chunkSizeCells * tileSize);
+
+        // Group by Chunk Sector (cx, cz) and Material to allow camera frustum culling
+        Dictionary<long, Dictionary<Material, List<CombineInstance>>> chunkBatches =
+            new Dictionary<long, Dictionary<Material, List<CombineInstance>>>();
         List<GameObject> toClean = new List<GameObject>();
 
         Matrix4x4 rootInv = root.worldToLocalMatrix;
@@ -840,10 +955,21 @@ public class BackroomsRoomGenerator : MonoBehaviour
             if (mr == null || mr.sharedMaterial == null) continue;
 
             Material mat = mr.sharedMaterial;
-            if (!batches.TryGetValue(mat, out List<CombineInstance> list))
+            Vector3 localPos = rootInv.MultiplyPoint3x4(mf.transform.position);
+            int cx = Mathf.FloorToInt(localPos.x / chunkWorldSize);
+            int cz = Mathf.FloorToInt(localPos.z / chunkWorldSize);
+            long chunkKey = ((long)cx << 32) | (uint)cz;
+
+            if (!chunkBatches.TryGetValue(chunkKey, out var matDict))
+            {
+                matDict = new Dictionary<Material, List<CombineInstance>>();
+                chunkBatches[chunkKey] = matDict;
+            }
+
+            if (!matDict.TryGetValue(mat, out List<CombineInstance> list))
             {
                 list = new List<CombineInstance>();
-                batches[mat] = list;
+                matDict[mat] = list;
             }
 
             CombineInstance ci = new CombineInstance();
@@ -863,28 +989,39 @@ public class BackroomsRoomGenerator : MonoBehaviour
             if (mf != null) Destroy(mf);
         }
 
-        // Create one combined mesh per material batch (reduces thousands of draw calls down to ~5)
-        foreach (KeyValuePair<Material, List<CombineInstance>> pair in batches)
+        // Create chunk meshes enabling efficient frustum culling per 10x10 cell sector
+        foreach (var chunkPair in chunkBatches)
         {
-            Material mat = pair.Key;
-            List<CombineInstance> instances = pair.Value;
-            if (instances.Count == 0) continue;
+            long chunkKey = chunkPair.Key;
+            int cx = (int)(chunkKey >> 32);
+            int cz = (int)(chunkKey & 0xFFFFFFFF);
 
-            GameObject chunkGo = new GameObject($"Combined_{mat.name}");
-            chunkGo.transform.SetParent(root, false);
-            chunkGo.isStatic = true;
+            GameObject chunkRoot = new GameObject($"Chunk_{cx}_{cz}");
+            chunkRoot.transform.SetParent(root, false);
+            chunkRoot.isStatic = true;
 
-            MeshFilter mf = chunkGo.AddComponent<MeshFilter>();
-            MeshRenderer mr = chunkGo.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = mat;
+            foreach (var matPair in chunkPair.Value)
+            {
+                Material mat = matPair.Key;
+                List<CombineInstance> instances = matPair.Value;
+                if (instances.Count == 0) continue;
 
-            Mesh combinedMesh = new Mesh();
-            combinedMesh.name = $"Combined_{mat.name}_Mesh";
-            combinedMesh.indexFormat = IndexFormat.UInt32;
-            combinedMesh.CombineMeshes(instances.ToArray(), true, true);
-            mf.sharedMesh = combinedMesh;
+                GameObject meshGo = new GameObject($"Mesh_{mat.name}");
+                meshGo.transform.SetParent(chunkRoot.transform, false);
+                meshGo.isStatic = true;
 
-            IgnoreForNavMesh(chunkGo);
+                MeshFilter mf = meshGo.AddComponent<MeshFilter>();
+                MeshRenderer mr = meshGo.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = mat;
+
+                Mesh combinedMesh = new Mesh();
+                combinedMesh.name = $"Chunk_{cx}_{cz}_{mat.name}";
+                combinedMesh.indexFormat = IndexFormat.UInt32;
+                combinedMesh.CombineMeshes(instances.ToArray(), true, true);
+                mf.sharedMesh = combinedMesh;
+
+                IgnoreForNavMesh(meshGo);
+            }
         }
     }
 
@@ -1057,60 +1194,182 @@ public class BackroomsRoomGenerator : MonoBehaviour
         PlaceExit(farthest, startCell);
     }
 
-    void PlaceExit(RectInt villainRoom, Vector2Int startCell)
+    struct WallCandidate
     {
-        RectInt exitRoom = rooms[0];
+        public int x;
+        public int z;
+        public int side;
+        public WallCandidate(int x, int z, int side) { this.x = x; this.z = z; this.side = side; }
+    }
+
+    void ReserveExitSpot()
+    {
+        if (rooms.Count == 0) return;
+
+        Vector2Int startCell = RoomCenter(rooms[0]);
+        RectInt bestRoom = rooms[0];
         float bestScore = -1f;
 
         foreach (RectInt r in rooms)
         {
-            if (r.Equals(villainRoom) && rooms.Count > 1) continue;
             Vector2Int c = RoomCenter(r);
-            float distToPlayer = Vector2Int.Distance(startCell, c);
-            float distToVillain = Vector2Int.Distance(RoomCenter(villainRoom), c);
-
-            float score = distToPlayer * 1.5f + distToVillain * 0.5f;
-            if (score > bestScore)
+            float dist = Vector2Int.Distance(startCell, c);
+            if (dist > bestScore)
             {
-                bestScore = score;
-                exitRoom = r;
+                bestScore = dist;
+                bestRoom = r;
             }
         }
 
-        Vector2Int exitCell = RoomCenter(exitRoom);
-        Vector3 exitPos = CellCenter(exitCell.x, exitCell.y);
-
         int[] edx = { 0, 1, 0, -1 };
         int[] edz = { 1, 0, -1, 0 };
-        float[] eyaw = { 180f, 270f, 0f, 90f };
-
-        Vector3 finalPos = exitPos;
-        Quaternion finalRot = Quaternion.identity;
-        bool foundWall = false;
-
-        for (int x = exitRoom.xMin; x < exitRoom.xMax && !foundWall; x++)
+        var candidates = GetWallCandidates(bestRoom, edx, edz);
+        if (candidates.Count > 0)
         {
-            for (int z = exitRoom.yMin; z < exitRoom.yMax && !foundWall; z++)
+            reservedExitCell = new Vector2Int(candidates[0].x, candidates[0].z);
+        }
+        else
+        {
+            reservedExitCell = RoomCenter(bestRoom);
+        }
+    }
+
+    List<WallCandidate> GetWallCandidates(RectInt room, int[] edx, int[] edz)
+    {
+        List<WallCandidate> list = new List<WallCandidate>();
+        int midX = room.xMin + room.width / 2;
+        int midZ = room.yMin + room.height / 2;
+
+        // Prioritize wall midpoints first (North=0, South=2, East=1, West=3)
+        if (IsExitWall(midX, room.yMax - 1, 0, edx, edz)) list.Add(new WallCandidate(midX, room.yMax - 1, 0));
+        if (IsExitWall(midX, room.yMin, 2, edx, edz)) list.Add(new WallCandidate(midX, room.yMin, 2));
+        if (IsExitWall(room.xMax - 1, midZ, 1, edx, edz)) list.Add(new WallCandidate(room.xMax - 1, midZ, 1));
+        if (IsExitWall(room.xMin, midZ, 3, edx, edz)) list.Add(new WallCandidate(room.xMin, midZ, 3));
+
+        // Then any other valid wall cell on the room perimeter
+        for (int x = room.xMin; x < room.xMax; x++)
+        {
+            for (int z = room.yMin; z < room.yMax; z++)
             {
                 for (int s = 0; s < 4; s++)
                 {
-                    int nx = x + edx[s];
-                    int nz = z + edz[s];
-                    if (nx < 0 || nx >= gridWidth || nz < 0 || nz >= gridHeight || !floor[nx, nz])
+                    if (IsExitWall(x, z, s, edx, edz))
                     {
-                        Vector3 cCenter = CellCenter(x, z);
-                        Vector3 wallOffset = new Vector3(edx[s], 0f, edz[s]) * (tileSize * 0.44f);
-                        finalPos = cCenter + wallOffset;
-                        finalRot = Quaternion.Euler(0f, eyaw[s], 0f);
-                        foundWall = true;
-                        break;
+                        var wc = new WallCandidate(x, z, s);
+                        bool exists = false;
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            if (list[i].x == wc.x && list[i].z == wc.z && list[i].side == wc.side)
+                            {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (!exists) list.Add(wc);
                     }
                 }
             }
         }
+        return list;
+    }
 
+    bool IsExitWall(int x, int z, int side, int[] edx, int[] edz)
+    {
+        if (!IsFloor(x, z)) return false;
+        int nx = x + edx[side];
+        int nz = z + edz[side];
+        return nx < 0 || nx >= gridWidth || nz < 0 || nz >= gridHeight || !floor[nx, nz];
+    }
+
+    void PlaceExit(RectInt villainRoom, Vector2Int startCell)
+    {
+        Vector3 startPos = CellCenter(startCell.x, startCell.y);
+
+        // Sort candidate rooms descending by combined distance from player spawn and villain
+        List<RectInt> candidateRooms = new List<RectInt>(rooms);
+        candidateRooms.Sort((a, b) =>
+        {
+            float distA = Vector2Int.Distance(startCell, RoomCenter(a)) * 1.5f +
+                          Vector2Int.Distance(RoomCenter(villainRoom), RoomCenter(a)) * 0.5f;
+            float distB = Vector2Int.Distance(startCell, RoomCenter(b)) * 1.5f +
+                          Vector2Int.Distance(RoomCenter(villainRoom), RoomCenter(b)) * 0.5f;
+            return distB.CompareTo(distA);
+        });
+
+        int[] edx = { 0, 1, 0, -1 };
+        int[] edz = { 1, 0, -1, 0 };
+        // Correct facing angles: North wall=0, East wall=90, South wall=180, West wall=270
+        // so the door front and green neon light face directly into the room.
+        float[] eyaw = { 0f, 90f, 180f, 270f };
+
+        Vector3 finalPos = Vector3.zero;
+        Quaternion finalRot = Quaternion.identity;
+        bool foundValidPlacement = false;
+
+        NavMeshPath path = new NavMeshPath();
+
+        foreach (RectInt room in candidateRooms)
+        {
+            if (room.Equals(villainRoom) && candidateRooms.Count > 1) continue;
+
+            List<WallCandidate> candidates = GetWallCandidates(room, edx, edz);
+
+            foreach (var cand in candidates)
+            {
+                Vector3 cCenter = CellCenter(cand.x, cand.z);
+                Vector3 wallOffset = new Vector3(edx[cand.side], 0f, edz[cand.side]) * (tileSize * 0.46f);
+                Vector3 testPos = cCenter + wallOffset;
+                Quaternion testRot = Quaternion.Euler(0f, eyaw[cand.side], 0f);
+
+                // Doorway entrance test point 0.8m in front of the door inside the room
+                Vector3 doorFront = testPos + testRot * new Vector3(0f, 0f, -0.8f);
+
+                // Strictly verify complete, unobstructed reachability via NavMesh from player spawn point
+                if (NavMesh.SamplePosition(doorFront, out NavMeshHit hit, tileSize, NavMesh.AllAreas))
+                {
+                    if (NavMesh.CalculatePath(startPos, hit.position, NavMesh.AllAreas, path) &&
+                        path.status == NavMeshPathStatus.PathComplete)
+                    {
+                        finalPos = testPos;
+                        finalRot = testRot;
+                        foundValidPlacement = true;
+                        break;
+                    }
+                }
+            }
+
+            if (foundValidPlacement) break;
+        }
+
+        // Fallback if no wall passed the strict path check
+        if (!foundValidPlacement && candidateRooms.Count > 0)
+        {
+            RectInt fallbackRoom = candidateRooms[0];
+            Vector2Int c = RoomCenter(fallbackRoom);
+            finalPos = CellCenter(c.x, c.y) + Vector3.forward * (tileSize * 0.44f);
+            finalRot = Quaternion.identity;
+        }
+
+        // Build procedural green doorway exit portal
         GameObject exitGo = BackroomsExitZone.BuildExitPortal(finalPos, finalRot, wallMaterial, lightPanelMaterial);
         if (root != null) exitGo.transform.SetParent(root, true);
+
+        // Safety clear: remove any stray colliders in front of the doorway threshold
+        Vector3 doorClearArea = finalPos + finalRot * new Vector3(0f, 0f, -0.8f);
+        Collider[] overlaps = Physics.OverlapSphere(doorClearArea, 1.4f);
+        foreach (Collider col in overlaps)
+        {
+            Transform t = col.transform;
+            while (t != null && t != root && t.parent != root) t = t.parent;
+            if (t != null && t.parent == root &&
+                !t.name.Contains("Exit") &&
+                !t.name.Contains("Wall") &&
+                !t.name.Contains("Floor") &&
+                !t.name.Contains("GeneratedMesh"))
+            {
+                Destroy(t.gameObject);
+            }
+        }
     }
 
     void EnsureGameOverSystem()
@@ -1123,6 +1382,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
     {
         if (FindAnyObjectByType<VictoryController>() != null) return;
         new GameObject("Victory Menu").AddComponent<VictoryController>();
+    }
+
+    void EnsureSurvivalDialogueHUD()
+    {
+        if (FindAnyObjectByType<SurvivalDialogueHUD>() != null) return;
+        new GameObject("Survival Dialogue HUD").AddComponent<SurvivalDialogueHUD>();
     }
 
     // Creates the ambience player once, so the backrooms SFX start with the level.

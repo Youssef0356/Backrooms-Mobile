@@ -60,6 +60,12 @@ public class PauseMenuController : MonoBehaviour
     [Tooltip("Show the on-screen pause button in the top right corner.")]
     [SerializeField] bool showPauseButton = true;
 
+    // ------------------------------------------------------------- survival guide
+
+    [Header("Survival Guide (Objectives & Controls)")]
+    [Tooltip("Show the on-screen '?' guide button in the top right corner next to pause.")]
+    [SerializeField] bool showGuideButton = false;
+
     // ------------------------------------------------------------- labels
 
     [Header("Labels")]
@@ -93,7 +99,13 @@ public class PauseMenuController : MonoBehaviour
     VisualElement root;
     VisualElement overlay;
     VisualElement pauseButton;
+    VisualElement guideButton;
+    VisualElement card;
+    VisualElement controlsCard;
+    VisualElement guideCard;
     Button resumeButton;
+    Button guideCloseButton;
+    bool openedGuideFromPause;
 
     // Safe area tracking for corner HUD buttons (notch / camera cut-out / rounded corners).
     // Expressed in panel units, same space the stylesheet uses.
@@ -113,7 +125,15 @@ public class PauseMenuController : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        PlayerPrefs.SetInt("backrooms.hideGuideOnStart", 1);
+        PlayerPrefs.Save();
         BuildUI();
+    }
+
+    void Start()
+    {
+        // Survival guidance is now presented seamlessly via top dialogue subtitles (SurvivalDialogueHUD)
+        // instead of pausing gameplay with a full-screen manual modal.
     }
 
     void OnEnable()
@@ -243,6 +263,8 @@ public class PauseMenuController : MonoBehaviour
         showPauseButton = visible;
         if (pauseButton != null)
             pauseButton.style.display = (visible && !IsPaused) ? DisplayStyle.Flex : DisplayStyle.None;
+        if (guideButton != null)
+            guideButton.style.display = (visible && !IsPaused && showGuideButton) ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
     void ShowMenu(bool show)
@@ -253,7 +275,67 @@ public class PauseMenuController : MonoBehaviour
         if (pauseButton != null)
             pauseButton.style.display = (show || !showPauseButton) ? DisplayStyle.None : DisplayStyle.Flex;
 
-        if (show) resumeButton?.Focus();
+        if (guideButton != null)
+            guideButton.style.display = (show || !showGuideButton) ? DisplayStyle.None : DisplayStyle.Flex;
+
+        if (show)
+        {
+            if (card != null) card.RemoveFromClassList("is-hidden");
+            if (controlsCard != null) controlsCard.AddToClassList("is-hidden");
+            if (guideCard != null) guideCard.AddToClassList("is-hidden");
+            resumeButton?.Focus();
+        }
+    }
+
+    /// <summary>
+    /// Opens the in-game survival guide and controls manual.
+    /// Pauses time and unlocks the cursor for reviewing the guide.
+    /// </summary>
+    public void OpenGuide(bool fromPauseMenu = false)
+    {
+        if (GameOverController.IsGameOver || VictoryController.IsGameWon) return;
+
+        openedGuideFromPause = fromPauseMenu;
+
+        if (!IsPaused)
+        {
+            IsPaused = true;
+            previousTimeScale = Time.timeScale;
+            Time.timeScale = pauseTimeScale;
+            if (unlockCursorWhenPaused) UnlockCursor();
+            PauseStateChanged?.Invoke(true);
+        }
+
+        if (card != null) card.AddToClassList("is-hidden");
+        if (controlsCard != null) controlsCard.AddToClassList("is-hidden");
+        if (guideCard != null) guideCard.RemoveFromClassList("is-hidden");
+
+        if (guideCloseButton != null)
+        {
+            guideCloseButton.text = fromPauseMenu ? "RETURN TO PAUSE" : "ENTER THE BACKROOMS";
+        }
+
+        if (overlay != null) overlay.style.display = DisplayStyle.Flex;
+        if (pauseButton != null) pauseButton.style.display = DisplayStyle.None;
+        if (guideButton != null) guideButton.style.display = DisplayStyle.None;
+    }
+
+    /// <summary>
+    /// Closes the guide and either returns to the pause menu or unpauses back into active gameplay.
+    /// </summary>
+    public void CloseGuide()
+    {
+        if (openedGuideFromPause)
+        {
+            if (guideCard != null) guideCard.AddToClassList("is-hidden");
+            if (card != null) card.RemoveFromClassList("is-hidden");
+            resumeButton?.Focus();
+        }
+        else
+        {
+            if (guideCard != null) guideCard.AddToClassList("is-hidden");
+            Resume();
+        }
     }
 
     void UnlockCursor()
@@ -316,6 +398,12 @@ public class PauseMenuController : MonoBehaviour
 
         pauseButton.style.right = rightPos;
         pauseButton.style.top = topPos;
+
+        if (guideButton != null)
+        {
+            guideButton.style.right = rightPos + 68f;
+            guideButton.style.top = topPos;
+        }
     }
 
     // ------------------------------------------------------------- UI build
@@ -357,12 +445,23 @@ public class PauseMenuController : MonoBehaviour
         pauseButton.Add(gearIcon);
         root.Add(pauseButton);
 
+        // corner guide / help button
+        if (showGuideButton)
+        {
+            guideButton = new Button(() => OpenGuide(fromPauseMenu: false));
+            guideButton.AddToClassList("guide-fab");
+            Label qMark = MakeLabel("?", "guide-fab-text");
+            qMark.pickingMode = PickingMode.Ignore;
+            guideButton.Add(qMark);
+            root.Add(guideButton);
+        }
+
         // overlay + card
         overlay = new VisualElement();
         overlay.AddToClassList("pause-overlay");
         root.Add(overlay);
 
-        VisualElement card = new VisualElement();
+        card = new VisualElement();
         card.AddToClassList("pause-card");
         overlay.Add(card);
 
@@ -388,20 +487,22 @@ public class PauseMenuController : MonoBehaviour
                 minValue: 10f, maxValue: 200f, isSensitivity: true));
 
         if (showGraphicsOption)
-            card.Add(BuildGraphicsDropdown());
+            card.Add(BuildGraphicsSelector());
 
         if (showFrameRateOption)
-            card.Add(BuildFrameRateDropdown());
+            card.Add(BuildFrameRateSelector());
 
-        VisualElement controlsCard = BuildControlsCard(card);
+        controlsCard = BuildControlsCard(card);
         overlay.Add(controlsCard);
+
+        guideCard = BuildGuideCard();
+        overlay.Add(guideCard);
 
         if (showControlsButton)
         {
-            card.Add(MakeButton("CONTROLS", () =>
+            card.Add(MakeButton("SURVIVAL MANUAL & CONTROLS", () =>
             {
-                card.AddToClassList("is-hidden");
-                controlsCard.RemoveFromClassList("is-hidden");
+                OpenGuide(fromPauseMenu: true);
             }));
         }
 
@@ -447,7 +548,7 @@ public class PauseMenuController : MonoBehaviour
         return setting;
     }
 
-    VisualElement BuildGraphicsDropdown()
+    VisualElement BuildGraphicsSelector()
     {
         VisualElement setting = new VisualElement();
         setting.AddToClassList("pause-setting");
@@ -456,30 +557,45 @@ public class PauseMenuController : MonoBehaviour
         row.AddToClassList("pause-setting-row");
         setting.Add(row);
 
-        row.Add(MakeLabel("GRAPHICS", "pause-setting-label"));
+        row.Add(MakeLabel("GRAPHICS QUALITY", "pause-setting-label"));
+
+        VisualElement selectorBar = new VisualElement();
+        selectorBar.AddToClassList("pause-segmented-bar");
 
         string[] names = QualitySettings.names;
-        DropdownField dropdown = new DropdownField();
-        dropdown.AddToClassList("pause-dropdown");
         if (names != null && names.Length > 0)
         {
-            dropdown.choices = new System.Collections.Generic.List<string>(names);
             int current = GameSettings.QualityLevel >= 0
                 ? GameSettings.QualityLevel
                 : QualitySettings.GetQualityLevel();
             current = Mathf.Clamp(current, 0, names.Length - 1);
-            dropdown.SetValueWithoutNotify(names[current]);
-            dropdown.RegisterValueChangedCallback(evt =>
+
+            var buttons = new System.Collections.Generic.List<Button>();
+            for (int i = 0; i < names.Length; i++)
             {
-                int index = Array.IndexOf(names, evt.newValue);
-                if (index >= 0) GameSettings.SetQualityLevel(index);
-            });
+                int qualityIndex = i;
+                Button btn = new Button();
+                btn.text = names[i].ToUpper();
+                btn.AddToClassList("pause-segmented-pill");
+                if (font != null) btn.style.unityFont = font;
+                if (qualityIndex == current) btn.AddToClassList("is-pause-pill-active");
+
+                btn.clicked += () =>
+                {
+                    foreach (var b in buttons) b.RemoveFromClassList("is-pause-pill-active");
+                    btn.AddToClassList("is-pause-pill-active");
+                    GameSettings.SetQualityLevel(qualityIndex);
+                };
+
+                buttons.Add(btn);
+                selectorBar.Add(btn);
+            }
         }
-        setting.Add(dropdown);
+        setting.Add(selectorBar);
         return setting;
     }
 
-    VisualElement BuildFrameRateDropdown()
+    VisualElement BuildFrameRateSelector()
     {
         VisualElement setting = new VisualElement();
         setting.AddToClassList("pause-setting");
@@ -490,27 +606,39 @@ public class PauseMenuController : MonoBehaviour
 
         row.Add(MakeLabel("TARGET FPS", "pause-setting-label"));
 
-        var options = new System.Collections.Generic.List<string> { "30 FPS (Battery Saver)", "60 FPS (Default)", "Max / Uncapped" };
-        int[] fpsValues = new int[] { 30, 60, -1 };
+        VisualElement selectorBar = new VisualElement();
+        selectorBar.AddToClassList("pause-segmented-bar");
 
-        DropdownField dropdown = new DropdownField();
-        dropdown.AddToClassList("pause-dropdown");
-        dropdown.choices = options;
+        var options = new string[] { "30 FPS", "60 FPS", "MAX" };
+        var fpsValues = new int[] { 30, 60, -1 };
 
         int currentFps = GameSettings.TargetFrameRate;
         int selectedIndex = 1;
         if (currentFps == 30) selectedIndex = 0;
         else if (currentFps <= 0 || currentFps > 60) selectedIndex = 2;
 
-        dropdown.SetValueWithoutNotify(options[selectedIndex]);
-        dropdown.RegisterValueChangedCallback(evt =>
+        var buttons = new System.Collections.Generic.List<Button>();
+        for (int i = 0; i < options.Length; i++)
         {
-            int idx = options.IndexOf(evt.newValue);
-            if (idx >= 0 && idx < fpsValues.Length)
-                GameSettings.SetTargetFrameRate(fpsValues[idx]);
-        });
+            int fpsIndex = i;
+            Button btn = new Button();
+            btn.text = options[i];
+            btn.AddToClassList("pause-segmented-pill");
+            if (font != null) btn.style.unityFont = font;
+            if (fpsIndex == selectedIndex) btn.AddToClassList("is-pause-pill-active");
 
-        setting.Add(dropdown);
+            btn.clicked += () =>
+            {
+                foreach (var b in buttons) b.RemoveFromClassList("is-pause-pill-active");
+                btn.AddToClassList("is-pause-pill-active");
+                GameSettings.SetTargetFrameRate(fpsValues[fpsIndex]);
+            };
+
+            buttons.Add(btn);
+            selectorBar.Add(btn);
+        }
+
+        setting.Add(selectorBar);
         return setting;
     }
 
@@ -565,6 +693,191 @@ public class PauseMenuController : MonoBehaviour
         row.Add(keyLabel);
         row.Add(descLabel);
         return row;
+    }
+
+    VisualElement BuildGuideCard()
+    {
+        VisualElement gCard = new VisualElement();
+        gCard.AddToClassList("guide-card");
+        gCard.AddToClassList("is-hidden");
+
+        gCard.Add(MakeLabel("SURVIVAL MANUAL", "pause-heading"));
+        gCard.Add(MakeLabel("LEVEL 0 // ARCHIVAL RECONNAISSANCE PROTOCOLS", "pause-subheading"));
+
+        // Tab row
+        VisualElement tabs = new VisualElement();
+        tabs.AddToClassList("guide-tabs");
+        gCard.Add(tabs);
+
+        Button tabObjective = new Button { text = "OBJECTIVE" };
+        tabObjective.AddToClassList("guide-tab-btn");
+        tabObjective.AddToClassList("guide-tab-btn--active");
+        ApplyFont(tabObjective);
+        tabs.Add(tabObjective);
+
+        Button tabControls = new Button { text = "CONTROLS" };
+        tabControls.AddToClassList("guide-tab-btn");
+        ApplyFont(tabControls);
+        tabs.Add(tabControls);
+
+        Button tabSurvival = new Button { text = "SURVIVAL RULES" };
+        tabSurvival.AddToClassList("guide-tab-btn");
+        ApplyFont(tabSurvival);
+        tabs.Add(tabSurvival);
+
+        // Scroll container
+        ScrollView scroll = new ScrollView(ScrollViewMode.Vertical);
+        scroll.AddToClassList("guide-scroll");
+        gCard.Add(scroll);
+
+        // --- SECTION 1: OBJECTIVE ---
+        VisualElement secObjective = new VisualElement();
+        secObjective.AddToClassList("guide-section");
+        scroll.Add(secObjective);
+
+        secObjective.Add(MakeGuideBox(
+            "PRIMARY MISSION: ESCAPE LEVEL 0",
+            "You have no-clipped into Level 0 ('The Lobby'). Your objective is to navigate the yellow labyrinth, locate the glowing anomalous Exit Threshold, and cross it to escape. Avoid entity contact at all costs.",
+            false));
+
+        secObjective.Add(MakeGuideBox(
+            "AUDIO BEACON: LISTEN FOR THE ELECTRICAL HUM",
+            "The exit threshold emits a continuous 3D electrical humming sound. When you are within 18 meters, you will hear this hum. The louder it gets, the closer you are to the exit door!",
+            false));
+
+        secObjective.Add(MakeGuideBox(
+            "CORRIDOR NAVIGATION & LOOPS",
+            "The map is composed of interconnected rooms, loops, and dead-ends. Keep track of your turns. If an entity spots you, avoid cornering yourself into dead-end branches.",
+            false));
+
+        // --- SECTION 2: CONTROLS ---
+        VisualElement secControls = new VisualElement();
+        secControls.AddToClassList("guide-section");
+        secControls.AddToClassList("is-hidden");
+        scroll.Add(secControls);
+
+        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
+
+        secControls.Add(MakeGuideBox(
+            isMobile ? "MOBILE TOUCH CONTROLS" : "KEYBOARD & MOUSE CONTROLS",
+            isMobile 
+                ? "Controls are calibrated for touchscreens with full device notch / safe-area support."
+                : "Standard first-person PC controls with mouse aiming.",
+            false));
+
+        if (isMobile)
+        {
+            secControls.Add(MakeControlRow("LEFT JOYSTICK", "DRAG THUMB TO MOVE"));
+            secControls.Add(MakeControlRow("RIGHT SCREEN", "SWIPE ANYWHERE TO AIM CAMERA"));
+            secControls.Add(MakeControlRow("TORCH ICON", "TOGGLE FLASHLIGHT ON / OFF"));
+            secControls.Add(MakeControlRow("SPRINT ICON", "HOLD TO RUN (WARNING: LOUD NOISE!)"));
+            secControls.Add(MakeControlRow("GEAR ICON [⚙]", "PAUSE, SENSITIVITY, SOUND & VIDEO"));
+            secControls.Add(MakeControlRow("HELP ICON [?]", "REOPEN THIS SURVIVAL MANUAL"));
+        }
+        else
+        {
+            secControls.Add(MakeControlRow("W A S D", "MOVE AROUND CORRIDORS"));
+            secControls.Add(MakeControlRow("MOUSE", "AIM & LOOK AROUND"));
+            secControls.Add(MakeControlRow("F", "TOGGLE FLASHLIGHT"));
+            secControls.Add(MakeControlRow("SHIFT (HOLD)", "SPRINT (WARNING: LOUD NOISE!)"));
+            secControls.Add(MakeControlRow("SPACE", "JUMP"));
+            secControls.Add(MakeControlRow("ESC", "PAUSE MENU"));
+        }
+
+        // --- SECTION 3: SURVIVAL RULES ---
+        VisualElement secSurvival = new VisualElement();
+        secSurvival.AddToClassList("guide-section");
+        secSurvival.AddToClassList("is-hidden");
+        scroll.Add(secSurvival);
+
+        secSurvival.Add(MakeGuideBox(
+            "RULE 1: FLASHLIGHT ATTRACTS THE ENTITY",
+            "CRITICAL: Turning your flashlight ON doubles the entity's detection range from 12m to 24m and widens its field-of-view to 150°! Entities spot light beams across long corridors. Keep your light OFF when traveling—flick it on only briefly to inspect room entrances.",
+            true));
+
+        secSurvival.Add(MakeGuideBox(
+            "RULE 2: SPRINTING RADIATES NOISE THROUGH WALLS",
+            "CRITICAL: Sprinting sends heavy carpet vibrations in a 15-meter radius through walls. Entities immediately stalk toward footstep noise. Walk quietly (3.5m noise radius) whenever possible. Only sprint to break away during active chases!",
+            true));
+
+        secSurvival.Add(MakeGuideBox(
+            "RULE 3: CORRIDOR EVASION & FLANKING",
+            "The entity anticipates player movement in loops. When running away, take two sharp turns around consecutive corners, then STOP sprinting. The monster will stop and search your last seen position instead of cutting you off ahead.",
+            false));
+
+        // Tab click events
+        tabObjective.clicked += () =>
+        {
+            tabObjective.AddToClassList("guide-tab-btn--active");
+            tabControls.RemoveFromClassList("guide-tab-btn--active");
+            tabSurvival.RemoveFromClassList("guide-tab-btn--active");
+
+            secObjective.RemoveFromClassList("is-hidden");
+            secControls.AddToClassList("is-hidden");
+            secSurvival.AddToClassList("is-hidden");
+        };
+
+        tabControls.clicked += () =>
+        {
+            tabObjective.RemoveFromClassList("guide-tab-btn--active");
+            tabControls.AddToClassList("guide-tab-btn--active");
+            tabSurvival.RemoveFromClassList("guide-tab-btn--active");
+
+            secObjective.AddToClassList("is-hidden");
+            secControls.RemoveFromClassList("is-hidden");
+            secSurvival.AddToClassList("is-hidden");
+        };
+
+        tabSurvival.clicked += () =>
+        {
+            tabObjective.RemoveFromClassList("guide-tab-btn--active");
+            tabControls.RemoveFromClassList("guide-tab-btn--active");
+            tabSurvival.AddToClassList("guide-tab-btn--active");
+
+            secObjective.AddToClassList("is-hidden");
+            secControls.AddToClassList("is-hidden");
+            secSurvival.RemoveFromClassList("is-hidden");
+        };
+
+        // Footer
+        VisualElement footer = new VisualElement();
+        footer.AddToClassList("guide-footer");
+        gCard.Add(footer);
+
+        Button replaySubtitlesBtn = MakeButton("PLAY HUD SUBTITLES", () =>
+        {
+            CloseGuide();
+            Resume();
+            SurvivalDialogueHUD.Instance?.ReplaySurvivalIntro();
+        });
+        replaySubtitlesBtn.style.marginTop = 0;
+        replaySubtitlesBtn.style.height = 42;
+        replaySubtitlesBtn.style.minWidth = 180;
+        footer.Add(replaySubtitlesBtn);
+
+        guideCloseButton = MakeButton("RETURN TO PAUSE", CloseGuide);
+        guideCloseButton.style.marginTop = 0;
+        guideCloseButton.style.height = 42;
+        guideCloseButton.style.minWidth = 180;
+        footer.Add(guideCloseButton);
+
+        return gCard;
+    }
+
+    VisualElement MakeGuideBox(string title, string desc, bool isDanger)
+    {
+        VisualElement box = new VisualElement();
+        box.AddToClassList("guide-box");
+        if (isDanger) box.AddToClassList("guide-box--danger");
+
+        Label titleLabel = MakeLabel(title, "guide-box-title");
+        if (isDanger) titleLabel.AddToClassList("guide-box-title--danger");
+        box.Add(titleLabel);
+
+        Label descLabel = MakeLabel(desc, "guide-box-desc");
+        box.Add(descLabel);
+
+        return box;
     }
 
     /// Music slider: saves through GameSettings and updates the live ambience.

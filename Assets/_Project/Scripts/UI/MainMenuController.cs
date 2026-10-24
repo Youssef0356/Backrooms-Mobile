@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
+using Cursor = UnityEngine.Cursor;
 
 /// <summary>
 /// Drives the main menu: wires the buttons, fills in the version block, runs the
@@ -66,6 +67,8 @@ public class MainMenuController : MonoBehaviour
     Slider musicSlider;
     Slider sensitivitySlider;
     Slider brightnessSlider;
+    VisualElement graphicsSelector;
+    VisualElement framerateSelector;
     DropdownField graphicsDropdown;
     DropdownField framerateDropdown;
 
@@ -113,6 +116,8 @@ public class MainMenuController : MonoBehaviour
         musicSlider = root.Q<Slider>("music-slider");
         sensitivitySlider = root.Q<Slider>("sensitivity-slider");
         brightnessSlider = root.Q<Slider>("brightness-slider");
+        graphicsSelector = root.Q<VisualElement>("graphics-selector");
+        framerateSelector = root.Q<VisualElement>("framerate-selector");
         graphicsDropdown = root.Q<DropdownField>("graphics-dropdown");
         framerateDropdown = root.Q<DropdownField>("framerate-dropdown");
 
@@ -121,6 +126,9 @@ public class MainMenuController : MonoBehaviour
 
     void OnEnable()
     {
+        UnityEngine.Cursor.lockState = CursorLockMode.None;
+        UnityEngine.Cursor.visible = true;
+
         ApplyFont();
         FillVersionBlock();
         WireButtons();
@@ -354,48 +362,94 @@ public class MainMenuController : MonoBehaviour
 
     void WireGraphics()
     {
-        if (graphicsDropdown == null) return;
-
         string[] names = QualitySettings.names;
-        if (names.Length == 0) return;
-
-        graphicsDropdown.choices = new List<string>(names);
+        if (names == null || names.Length == 0) return;
 
         int current = GameSettings.QualityLevel >= 0
             ? GameSettings.QualityLevel
             : QualitySettings.GetQualityLevel();
         current = Mathf.Clamp(current, 0, names.Length - 1);
-        graphicsDropdown.SetValueWithoutNotify(names[current]);
 
-        graphicsDropdown.RegisterValueChangedCallback(evt =>
+        if (graphicsSelector != null)
         {
-            int index = System.Array.IndexOf(names, evt.newValue);
-            if (index >= 0) GameSettings.SetQualityLevel(index);
-        });
+            graphicsSelector.Clear();
+            var buttons = new List<Button>();
+            for (int i = 0; i < names.Length; i++)
+            {
+                int qualityIndex = i;
+                Button btn = new Button();
+                btn.text = names[i].ToUpper();
+                btn.AddToClassList("segmented-pill");
+                if (qualityIndex == current) btn.AddToClassList("is-pill-active");
+
+                btn.clicked += () =>
+                {
+                    foreach (var b in buttons) b.RemoveFromClassList("is-pill-active");
+                    btn.AddToClassList("is-pill-active");
+                    GameSettings.SetQualityLevel(qualityIndex);
+                };
+
+                buttons.Add(btn);
+                graphicsSelector.Add(btn);
+            }
+        }
+        else if (graphicsDropdown != null)
+        {
+            graphicsDropdown.choices = new List<string>(names);
+            graphicsDropdown.SetValueWithoutNotify(names[current]);
+            graphicsDropdown.RegisterValueChangedCallback(evt =>
+            {
+                int index = System.Array.IndexOf(names, evt.newValue);
+                if (index >= 0) GameSettings.SetQualityLevel(index);
+            });
+        }
     }
 
     void WireFrameRate()
     {
-        if (framerateDropdown == null) return;
-
-        List<string> options = new List<string> { "30 FPS (Battery Saver)", "60 FPS (Default)", "Max / Uncapped" };
-        int[] fpsValues = new int[] { 30, 60, -1 };
-
-        framerateDropdown.choices = options;
+        var options = new string[] { "30 FPS", "60 FPS", "MAX" };
+        var fpsValues = new int[] { 30, 60, -1 };
 
         int currentFps = GameSettings.TargetFrameRate;
         int selectedIndex = 1; // default to 60
         if (currentFps == 30) selectedIndex = 0;
         else if (currentFps <= 0 || currentFps > 60) selectedIndex = 2;
 
-        framerateDropdown.SetValueWithoutNotify(options[selectedIndex]);
-
-        framerateDropdown.RegisterValueChangedCallback(evt =>
+        if (framerateSelector != null)
         {
-            int idx = options.IndexOf(evt.newValue);
-            if (idx >= 0 && idx < fpsValues.Length)
-                GameSettings.SetTargetFrameRate(fpsValues[idx]);
-        });
+            framerateSelector.Clear();
+            var buttons = new List<Button>();
+            for (int i = 0; i < options.Length; i++)
+            {
+                int fpsIndex = i;
+                Button btn = new Button();
+                btn.text = options[i];
+                btn.AddToClassList("segmented-pill");
+                if (fpsIndex == selectedIndex) btn.AddToClassList("is-pill-active");
+
+                btn.clicked += () =>
+                {
+                    foreach (var b in buttons) b.RemoveFromClassList("is-pill-active");
+                    btn.AddToClassList("is-pill-active");
+                    GameSettings.SetTargetFrameRate(fpsValues[fpsIndex]);
+                };
+
+                buttons.Add(btn);
+                framerateSelector.Add(btn);
+            }
+        }
+        else if (framerateDropdown != null)
+        {
+            var optList = new List<string>(options);
+            framerateDropdown.choices = optList;
+            framerateDropdown.SetValueWithoutNotify(options[selectedIndex]);
+            framerateDropdown.RegisterValueChangedCallback(evt =>
+            {
+                int idx = System.Array.IndexOf(options, evt.newValue);
+                if (idx >= 0 && idx < fpsValues.Length)
+                    GameSettings.SetTargetFrameRate(fpsValues[idx]);
+            });
+        }
     }
 
     void UpdatePercentLabel(Label label, float value)
