@@ -115,3 +115,8 @@ InitTestScene*.unity*
 
 # Local build output (APK + IL2CPP backup folder, hundreds of MB)
 /[Ss]hipping/
+
+# Audio editing temporary peak files
+*.pkf
+*.pkf.meta
+

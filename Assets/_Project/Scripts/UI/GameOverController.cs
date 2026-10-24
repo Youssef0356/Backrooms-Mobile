@@ -33,10 +33,14 @@ public class GameOverController : MonoBehaviour
     [SerializeField] float cameraTurnSpeed = 10f;
 
     [Header("Audio")]
-    [Tooltip("Sound played upon defeat. If null, loads Resources/SFX/juanjo_ sound - signal lost.")]
+    [Tooltip("Sound played upon defeat. If null, picks a monster composition clip.")]
     [SerializeField] AudioClip defeatAudio;
     [Range(0f, 1f)]
     [SerializeField] float defeatAudioVolume = 0.9f;
+    [Tooltip("Fade-in duration in seconds for defeat audio.")]
+    [SerializeField] float defeatFadeInDuration = 0.8f;
+    [Tooltip("Fade-out duration in seconds for defeat audio.")]
+    [SerializeField] float defeatFadeOutDuration = 2.2f;
 
     [Header("Scene Navigation")]
     [SerializeField] string menuSceneName = "Menu";
@@ -94,6 +98,9 @@ public class GameOverController : MonoBehaviour
             Instance = null;
             IsGameOver = false;
         }
+
+        StopAllCoroutines();
+        if (audioSource != null) audioSource.Stop();
 
         RestoreCursor();
     }
@@ -305,15 +312,57 @@ public class GameOverController : MonoBehaviour
     {
         AudioClip clip = defeatAudio;
         if (clip == null)
+            clip = MonsterCompositionAudio.GetRandomCompositionClip();
+        if (clip == null)
             clip = Resources.Load<AudioClip>("SFX/juanjo_ sound - signal lost");
 
         if (clip != null && audioSource != null)
         {
-            audioSource.clip = clip;
-            audioSource.volume = defeatAudioVolume * GameSettings.MasterVolume;
-            audioSource.ignoreListenerPause = true;
-            audioSource.Play();
+            StartCoroutine(FadeDefeatAudioRoutine(clip));
         }
+    }
+
+    IEnumerator FadeDefeatAudioRoutine(AudioClip clip)
+    {
+        audioSource.clip = clip;
+        audioSource.ignoreListenerPause = true;
+        audioSource.volume = 0f;
+        audioSource.Play();
+
+        float targetVolume = defeatAudioVolume * GameSettings.MasterVolume;
+        float clipDuration = clip.length;
+
+        float fadeIn = Mathf.Min(defeatFadeInDuration, clipDuration * 0.3f);
+        float fadeOut = Mathf.Min(defeatFadeOutDuration, clipDuration * 0.45f);
+        float sustain = Mathf.Max(0f, clipDuration - fadeIn - fadeOut);
+
+        // 1. Fade in
+        float timer = 0f;
+        while (timer < fadeIn)
+        {
+            timer += Time.unscaledDeltaTime;
+            audioSource.volume = Mathf.Lerp(0f, targetVolume, Mathf.Clamp01(timer / fadeIn));
+            yield return null;
+        }
+        audioSource.volume = targetVolume;
+
+        // 2. Sustain
+        if (sustain > 0f)
+        {
+            yield return new WaitForSecondsRealtime(sustain);
+        }
+
+        // 3. Fade out
+        timer = 0f;
+        while (timer < fadeOut)
+        {
+            timer += Time.unscaledDeltaTime;
+            audioSource.volume = Mathf.Lerp(targetVolume, 0f, Mathf.Clamp01(timer / fadeOut));
+            yield return null;
+        }
+
+        audioSource.volume = 0f;
+        audioSource.Stop();
     }
 
     void UnlockCursor()

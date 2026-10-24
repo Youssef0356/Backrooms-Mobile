@@ -154,31 +154,43 @@ public class MainMenuController : MonoBehaviour
 
     void WireButtons()
     {
-        if (playButton != null) playButton.clicked += OnPlayClicked;
-        if (quitButton != null) quitButton.clicked += OnQuitClicked;
-        if (settingsButton != null) settingsButton.clicked += OnSettingsClicked;
-        if (controlsButton != null) controlsButton.clicked += OnControlsClicked;
+        WireButtonRow(playButton, OnPlayClicked);
+        WireButtonRow(quitButton, OnQuitClicked);
+        WireButtonRow(settingsButton, OnSettingsClicked);
+        WireButtonRow(controlsButton, OnControlsClicked);
+
         if (settingsCloseButton != null) settingsCloseButton.clicked += CloseSettings;
         if (controlsCloseButton != null) controlsCloseButton.clicked += CloseControls;
-
-        // light up the ">" marker of a row when its button is hovered or focused
-        HookHover(playButton);
-        HookHover(settingsButton);
-        HookHover(controlsButton);
-        HookHover(quitButton);
     }
 
-    void HookHover(Button button)
+    void WireButtonRow(Button button, System.Action onClick)
     {
         if (button == null) return;
+        if (onClick != null) button.clicked += onClick;
 
         VisualElement row = button.parent;
         if (row == null) return;
 
+        // Light up the ">" marker on hover, focus, or mobile touch down
         button.RegisterCallback<PointerEnterEvent>(_ => row.AddToClassList("is-active"));
         button.RegisterCallback<PointerLeaveEvent>(_ => row.RemoveFromClassList("is-active"));
+        button.RegisterCallback<PointerDownEvent>(_ => row.AddToClassList("is-active"));
+        button.RegisterCallback<PointerUpEvent>(_ => row.RemoveFromClassList("is-active"));
         button.RegisterCallback<FocusInEvent>(_ => row.AddToClassList("is-active"));
         button.RegisterCallback<FocusOutEvent>(_ => row.RemoveFromClassList("is-active"));
+
+        // Allow tapping anywhere on the row (marker/padding) on mobile touch screens
+        if (onClick != null)
+        {
+            row.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (evt.target != button)
+                {
+                    button.Focus();
+                    onClick();
+                }
+            });
+        }
     }
 
     // ------------------------------------------------------------- settings

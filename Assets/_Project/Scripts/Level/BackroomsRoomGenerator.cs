@@ -147,6 +147,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         EnsureGameOverSystem();
         EnsureVictorySystem();
         EnsurePlayerMotion();
+        EnsureMonsterCompositionAudio();
     }
 
     // ---------------- Layout ----------------
@@ -1177,5 +1178,38 @@ public class BackroomsRoomGenerator : MonoBehaviour
         {
             targetPlayer.gameObject.AddComponent<StarterAssets.FirstPersonMotion>();
         }
+    }
+
+    void EnsureMonsterCompositionAudio()
+    {
+        MonsterCompositionAudio compAudio = FindAnyObjectByType<MonsterCompositionAudio>();
+        if (compAudio == null)
+        {
+            compAudio = new GameObject("Monster Composition Audio").AddComponent<MonsterCompositionAudio>();
+        }
+
+        // Collect spatial audio candidate spots across rooms and corridors
+        List<Vector3> candidateSpots = new List<Vector3>();
+
+        // 1. Room centers
+        foreach (RectInt r in rooms)
+        {
+            Vector2Int rc = RoomCenter(r);
+            candidateSpots.Add(CellCenter(rc.x, rc.y));
+        }
+
+        // 2. Sample various corridor/walkable cells across the map
+        for (int x = 2; x < gridWidth - 2; x += 3)
+        {
+            for (int z = 2; z < gridHeight - 2; z += 3)
+            {
+                if (floor != null && floor[x, z] && !roomCell[x, z])
+                {
+                    candidateSpots.Add(CellCenter(x, z));
+                }
+            }
+        }
+
+        compAudio.InitializeSpots(candidateSpots);
     }
 }

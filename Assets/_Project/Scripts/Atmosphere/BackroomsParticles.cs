@@ -116,6 +116,14 @@ public class BackroomsParticles : MonoBehaviour
         Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
         if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
         if (shader == null) shader = Shader.Find("Mobile/Particles/Alpha Blended");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+
+        if (shader == null)
+        {
+            Debug.LogWarning("BackroomsParticles: No particle/unlit shader available.");
+            return null;
+        }
 
         Material mat = new Material(shader);
         mat.mainTexture = glowTexture;
@@ -153,7 +161,7 @@ public class BackroomsParticles : MonoBehaviour
         ParticleSystemRenderer rend = dustObj.GetComponent<ParticleSystemRenderer>();
 
         dustMaterial = CreateParticleMaterial(BlendMode.Additive);
-        rend.material = dustMaterial;
+        if (dustMaterial != null) rend.material = dustMaterial;
 
         var main = dustSystem.main;
         main.maxParticles = maxDustParticles;
@@ -207,7 +215,7 @@ public class BackroomsParticles : MonoBehaviour
         ParticleSystemRenderer rend = auraObj.GetComponent<ParticleSystemRenderer>();
 
         miasmaMaterial = CreateParticleMaterial(BlendMode.Alpha);
-        rend.material = miasmaMaterial;
+        if (miasmaMaterial != null) rend.material = miasmaMaterial;
 
         var main = miasmaSystem.main;
         main.maxParticles = 50;
@@ -262,7 +270,7 @@ public class BackroomsParticles : MonoBehaviour
         ParticleSystemRenderer rend = sparkObj.GetComponent<ParticleSystemRenderer>();
 
         sparkMaterial = CreateParticleMaterial(BlendMode.Additive);
-        rend.material = sparkMaterial;
+        if (sparkMaterial != null) rend.material = sparkMaterial;
 
         var main = sparkSystem.main;
         main.maxParticles = 80;

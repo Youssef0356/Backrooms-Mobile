@@ -161,21 +161,39 @@ public class CameraVHSGlitch : MonoBehaviour
 
         glitchOverlay = overlayObj.AddComponent<Image>();
         glitchOverlay.raycastTarget = false; // Never block mobile touches
+        glitchOverlay.color = Color.clear;   // Safety: transparent by default, NEVER solid white
 
         RectTransform rt = glitchOverlay.rectTransform;
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.sizeDelta = Vector2.zero;
 
-        Shader shader = Shader.Find("Backrooms/VHSGlitch");
-        if (shader == null)
+        // Try loading from Resources material first, then Shader.Find
+        Material resourceMat = Resources.Load<Material>("M_VHSGlitch");
+        if (resourceMat != null)
         {
-            Debug.LogWarning("CameraVHSGlitch: Could not find shader 'Backrooms/VHSGlitch'.");
-            return;
+            glitchMaterial = new Material(resourceMat);
+        }
+        else
+        {
+            Shader shader = Shader.Find("Backrooms/VHSGlitch");
+            if (shader != null && shader.isSupported)
+            {
+                glitchMaterial = new Material(shader);
+            }
         }
 
-        glitchMaterial = new Material(shader);
-        glitchOverlay.material = glitchMaterial;
+        if (glitchMaterial != null)
+        {
+            glitchOverlay.material = glitchMaterial;
+            glitchOverlay.color = Color.white;
+        }
+        else
+        {
+            Debug.LogWarning("CameraVHSGlitch: Glitch material/shader unavailable. Disabling glitch overlay to avoid obscuring the view.");
+            Destroy(overlayObj);
+            glitchOverlay = null;
+        }
 
         if (enableOSD)
         {

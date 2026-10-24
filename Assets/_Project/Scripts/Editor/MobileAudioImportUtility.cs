@@ -10,16 +10,20 @@ using UnityEngine;
 /// Usage: Tools > Backrooms > Fix SFX Import Settings (Mobile)
 public static class MobileAudioImportUtility
 {
-    const string SfxFolder = "Assets/_Project/Audio/Resources/SFX";
+    static readonly string[] AudioFolders = new[]
+    {
+        "Assets/_Project/Audio/Resources/SFX",
+        "Assets/_Project/Audio/Resources/Composition"
+    };
     const float StreamingLengthSeconds = 60f;   // clips at least this long stream from disk
 
     [MenuItem("Tools/Backrooms/Fix SFX Import Settings (Mobile)")]
     public static void ApplyMobileSettings()
     {
-        string[] guids = AssetDatabase.FindAssets("t:AudioClip", new[] { SfxFolder });
+        string[] guids = AssetDatabase.FindAssets("t:AudioClip", AudioFolders);
         if (guids.Length == 0)
         {
-            Debug.LogWarning($"MobileAudioImportUtility: no audio clips found in {SfxFolder}.");
+            Debug.LogWarning("MobileAudioImportUtility: no audio clips found.");
             return;
         }
 

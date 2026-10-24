@@ -73,16 +73,16 @@
 
 .left-column {
     position: absolute;
-    left: 64px;
+    left: 80px;
     top: 0;
     bottom: 0;
-    width: 580px;
+    width: 680px;
     flex-direction: column;
     justify-content: center;
 }
 
 .eyebrow {
-    font-size: 13px;
+    font-size: 15px;
     letter-spacing: 5px;
     color: var(--accent-dim);
     -unity-text-align: middle-left;
@@ -90,7 +90,7 @@
 }
 
 .title {
-    font-size: 78px;
+    font-size: 82px;
     letter-spacing: 10px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -103,7 +103,7 @@
 }
 
 .subtitle {
-    font-size: 22px;
+    font-size: 24px;
     letter-spacing: 9px;
     color: var(--muted);
     -unity-text-align: middle-left;
@@ -111,27 +111,30 @@
 }
 
 .divider {
-    height: 1px;
+    height: 2px;
     background-color: var(--line);
     margin-top: 22px;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
 }
 
 /* ============================== menu buttons =============================== */
 
 .menu-list {
     flex-direction: column;
+    margin-top: 6px;
+    margin-bottom: 6px;
 }
 
 .menu-item {
     flex-direction: row;
     align-items: center;
-    height: 50px;
+    height: 74px;
+    margin-bottom: 12px;
 }
 
 .menu-item-marker {
-    width: 28px;
-    font-size: 22px;
+    width: 36px;
+    font-size: 32px;
     color: rgba(223, 216, 118, 0);
     -unity-text-align: middle-center;
     transition-property: color, translate;
@@ -142,22 +145,23 @@
 .menu-item:hover .menu-item-marker,
 .menu-item.is-active .menu-item-marker {
     color: var(--accent);
-    translate: 4px 0;
+    translate: 6px 0;
 }
 
 .menu-root .menu-button {
     flex-grow: 1;
-    height: 46px;
-    padding-left: 18px;
-    font-size: 23px;
+    height: 72px;
+    padding-left: 26px;
+    font-size: 32px;
     letter-spacing: 6px;
     -unity-font-style: bold;
     color: var(--text);
-    background-color: rgba(223, 216, 118, 0.05);
+    background-color: rgba(223, 216, 118, 0.06);
     background-image: none;
     border-width: 0;
-    border-left-width: 2px;
-    border-left-color: rgba(223, 216, 118, 0.30);
+    border-left-width: 4px;
+    border-left-color: rgba(223, 216, 118, 0.35);
+    border-radius: 4px;
     -unity-text-align: middle-left;
     transition-property: background-color, color, translate, border-left-color;
     transition-duration: 0.12s;
@@ -165,20 +169,21 @@
 }
 
 .menu-root .menu-button:hover {
-    background-color: rgba(223, 216, 118, 0.16);
+    background-color: rgba(223, 216, 118, 0.18);
     border-left-color: var(--accent);
     color: var(--accent);
     translate: 8px 0;
 }
 
 .menu-root .menu-button:focus {
-    background-color: rgba(223, 216, 118, 0.20);
+    background-color: rgba(223, 216, 118, 0.22);
     border-left-color: var(--accent);
     color: var(--accent);
 }
 
 .menu-root .menu-button:active {
-    background-color: rgba(223, 216, 118, 0.30);
+    background-color: rgba(223, 216, 118, 0.35);
+    border-left-color: var(--accent);
     color: rgb(12, 12, 6);
 }
 
@@ -187,22 +192,28 @@
 }
 
 .menu-root .menu-button--danger:hover {
-    background-color: rgba(196, 92, 74, 0.18);
+    background-color: rgba(196, 92, 74, 0.20);
     border-left-color: var(--danger);
     color: var(--danger);
 }
 
 .menu-root .menu-button--danger:focus {
-    background-color: rgba(196, 92, 74, 0.22);
+    background-color: rgba(196, 92, 74, 0.24);
     border-left-color: var(--danger);
     color: var(--danger);
 }
 
+.menu-root .menu-button--danger:active {
+    background-color: rgba(196, 92, 74, 0.38);
+    border-left-color: var(--danger);
+    color: rgb(12, 12, 6);
+}
+
 .hint {
-    margin-top: 26px;
-    font-size: 12px;
+    margin-top: 22px;
+    font-size: 14px;
     letter-spacing: 4px;
-    color: rgba(228, 224, 178, 0.32);
+    color: rgba(228, 224, 178, 0.35);
     -unity-text-align: middle-left;
 }
 
@@ -280,11 +291,11 @@
 }
 
 .overlay-card {
-    width: 540px;
-    padding-top: 26px;
-    padding-bottom: 26px;
-    padding-left: 32px;
-    padding-right: 32px;
+    width: 660px;
+    padding-top: 32px;
+    padding-bottom: 32px;
+    padding-left: 40px;
+    padding-right: 40px;
     background-color: var(--panel);
     border-left-width: 1px;
     border-right-width: 1px;
@@ -295,7 +306,7 @@
 }
 
 .overlay-heading {
-    font-size: 26px;
+    font-size: 32px;
     letter-spacing: 8px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -303,39 +314,53 @@
 }
 
 .menu-root .overlay-button {
-    margin-top: 26px;
-    height: 44px;
-    font-size: 20px;
+    margin-top: 28px;
+    height: 64px;
+    font-size: 26px;
     letter-spacing: 6px;
     -unity-font-style: bold;
     color: var(--text);
-    background-color: rgba(223, 216, 118, 0.05);
+    background-color: rgba(223, 216, 118, 0.06);
     background-image: none;
     border-width: 0;
-    border-left-width: 2px;
-    border-left-color: rgba(223, 216, 118, 0.30);
+    border-left-width: 4px;
+    border-left-color: rgba(223, 216, 118, 0.35);
+    border-radius: 4px;
     -unity-text-align: middle-left;
-    padding-left: 18px;
+    padding-left: 24px;
     transition-property: background-color, color, border-left-color;
     transition-duration: 0.12s;
 }
 
-.menu-root .overlay-button:hover {
-    background-color: rgba(223, 216, 118, 0.16);
+.menu-root .overlay-button:hover,
+.menu-root .overlay-button:focus {
+    background-color: rgba(223, 216, 118, 0.20);
     border-left-color: var(--accent);
     color: var(--accent);
+}
+
+.menu-root .overlay-button:active {
+    background-color: rgba(223, 216, 118, 0.35);
+    border-left-color: var(--accent);
+    color: rgb(12, 12, 6);
 }
 
 /* ============================== settings =================================== */
 
 .setting-slider {
     width: 100%;
-    margin-top: 14px;
+    margin-top: 16px;
+}
+
+.setting-slider .unity-base-field__label {
+    font-size: 17px;
+    letter-spacing: 3px;
+    color: var(--text);
 }
 
 .setting-value {
     margin-top: 2px;
-    font-size: 14px;
+    font-size: 16px;
     letter-spacing: 3px;
     color: var(--accent);
     -unity-text-align: upper-right;
@@ -343,25 +368,29 @@
 
 /* graphics dropdown, styled to match the slider rows */
 .setting-dropdown {
-    margin-top: 16px;
+    margin-top: 18px;
     width: 100%;
 }
 
 .setting-dropdown .unity-base-field__label {
     letter-spacing: 3px;
+    font-size: 17px;
     color: var(--text);
 }
 
 .setting-dropdown .unity-base-popup-field__input {
-    background-color: rgba(223, 216, 118, 0.05);
+    background-color: rgba(223, 216, 118, 0.06);
     border-width: 0;
-    border-left-width: 2px;
-    border-left-color: rgba(223, 216, 118, 0.30);
-    padding-left: 12px;
+    border-left-width: 4px;
+    border-left-color: rgba(223, 216, 118, 0.35);
+    border-radius: 4px;
+    height: 48px;
+    padding-left: 14px;
 }
 
 .setting-dropdown .unity-base-popup-field__text {
     color: var(--accent);
+    font-size: 17px;
     letter-spacing: 3px;
 }
 
@@ -370,6 +399,8 @@
     background-color: rgba(4, 5, 2, 0.95);
     color: var(--text);
     letter-spacing: 2px;
+    font-size: 17px;
+    height: 44px;
 }
 
 .unity-dropdown__item:hover,
@@ -381,22 +412,24 @@
 /* tint the default runtime theme slider to match the palette */
 .setting-slider .unity-base-slider__tracker {
     background-color: rgba(223, 216, 118, 0.16);
-    height: 4px;
+    height: 6px;
 }
 
 .setting-slider .unity-base-slider__dragger {
-    width: 14px;
-    height: 20px;
+    width: 24px;
+    height: 32px;
     background-color: var(--accent);
     border-width: 0;
+    border-radius: 3px;
 }
 
 .setting-slider .unity-base-slider__dragger-border {
-    width: 16px;
-    height: 22px;
+    width: 26px;
+    height: 34px;
     border-width: 1px;
     border-color: rgba(223, 216, 118, 0.55);
     background-color: rgba(0, 0, 0, 0);
+    border-radius: 3px;
 }
 
 /* ============================== controls =================================== */
@@ -404,12 +437,12 @@
 .key-row {
     flex-direction: row;
     align-items: center;
-    margin-top: 12px;
+    margin-top: 14px;
 }
 
 .key {
-    width: 150px;
-    font-size: 16px;
+    width: 170px;
+    font-size: 18px;
     letter-spacing: 3px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -418,7 +451,7 @@
 
 .key-desc {
     flex-grow: 1;
-    font-size: 15px;
+    font-size: 17px;
     letter-spacing: 3px;
     color: var(--muted);
     -unity-text-align: middle-left;
