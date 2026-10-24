@@ -34,24 +34,34 @@
     position: absolute;
     top: 18px;
     right: 18px;
-    width: 64px;
-    height: 64px;
-    font-size: 24px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-center;
-    color: var(--accent);
-    background-color: rgba(9, 10, 5, 0.55);
+    width: 56px;
+    height: 56px;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(9, 10, 5, 0.65);
     background-image: none;
-    border-width: 1px;
+    border-width: 1.5px;
     border-color: var(--line);
-    border-radius: 6px;
-    transition-property: background-color;
+    border-radius: 8px;
+    transition-property: background-color, border-color;
     transition-duration: 0.12s;
 }
 
 .pause-fab:hover {
-    background-color: rgba(223, 216, 118, 0.16);
+    background-color: rgba(223, 216, 118, 0.20);
+    border-color: var(--accent);
+}
+
+.pause-fab-icon {
+    width: 28px;
+    height: 28px;
+    background-image: resource("Icons/UI_Icon_Settings");
+    -unity-background-image-tint-color: var(--accent);
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.pause-fab:hover .pause-fab-icon {
+    -unity-background-image-tint-color: rgb(255, 252, 200);
 }
 
 .flashlight-fab {
@@ -77,11 +87,12 @@
 }
 
 .pause-card {
-    width: 560px;
-    padding-top: 30px;
-    padding-bottom: 30px;
-    padding-left: 34px;
-    padding-right: 34px;
+    width: 580px;
+    max-height: 90%;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-left: 30px;
+    padding-right: 30px;
     background-color: var(--panel);
     border-width: 1px;
     border-color: var(--line);
@@ -200,4 +211,58 @@
     border-width: 1px;
     border-color: rgba(223, 216, 118, 0.55);
     background-color: rgba(0, 0, 0, 0);
+}
+
+/* ============================== dropdowns ================================= */
+
+.pause-dropdown {
+    margin-top: 6px;
+    width: 100%;
+}
+
+.pause-dropdown .unity-base-field__label {
+    display: none;
+}
+
+.pause-dropdown .unity-base-popup-field__input {
+    background-color: rgba(223, 216, 118, 0.06);
+    border-width: 0;
+    border-left-width: 3px;
+    border-left-color: rgba(223, 216, 118, 0.35);
+    border-radius: 4px;
+    height: 38px;
+    padding-left: 12px;
+}
+
+.pause-dropdown .unity-base-popup-field__text {
+    color: var(--accent);
+    font-size: 15px;
+    letter-spacing: 2px;
+}
+
+/* ============================== controls modal ============================ */
+
+.pause-control-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    height: 32px;
+    margin-bottom: 4px;
+}
+
+.pause-control-key {
+    font-size: 14px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    color: var(--accent);
+}
+
+.pause-control-desc {
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--muted);
+}
+
+.is-hidden {
+    display: none;
 }

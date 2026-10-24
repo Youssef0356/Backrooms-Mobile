@@ -214,11 +214,17 @@ public class VictoryController : MonoBehaviour
         var player = GameObject.FindWithTag("Player");
         if (player != null)
         {
-            var cc = player.GetComponent<CharacterController>();
-            if (cc != null) cc.enabled = false;
+            var fpc = player.GetComponent<FirstPersonController>();
+            if (fpc != null) fpc.enabled = false;
+
+            var motion = player.GetComponent<FirstPersonMotion>();
+            if (motion != null) motion.enabled = false;
 
             var tpc = player.GetComponent<ThirdPersonController>();
             if (tpc != null) tpc.enabled = false;
+
+            var cc = player.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
 
             var input = player.GetComponent<StarterAssetsInputs>();
             if (input != null)

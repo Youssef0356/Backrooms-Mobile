@@ -2763,17 +2763,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 28b41fdbc69a58d42847f01787841225, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameOverController
-  caughtDelay: 0.85
+  caughtDelay: 2.4
   lookAtKiller: 1
-  cameraTurnSpeed: 10
+  cameraTurnSpeed: 12
   defeatAudio: {fileID: 0}
   defeatAudioVolume: 0.9
   menuSceneName: Menu
-  headingLabel: SIGNAL LOST
-  subtitleLabel: ANOMALOUS ENTITY CONTACT - VITAL SIGNS ZERO
+  headingLabel: SIGNAL TERMINATED
+  subtitleLabel: ANOMALOUS ENTITY CONTACT // TRAUMATIC TERMINATION
   retryButtonLabel: RE-ENTER LEVEL
   menuButtonLabel: RETURN TO MENU
-  threatName: ENTITY-001 (BACTERIA)
+  threatName: ENTITY-001 (PIRATE CLARK)
   uiFont: {fileID: 12800000, guid: f60718293a4b5c6d7e8f90a1b2c3d4e5, type: 3}
   fontResourcePath: Fonts/RobotoMono-Regular
   styleResourcePath: GameOver style

@@ -50,6 +50,8 @@ public class MenuCameraHUD : MonoBehaviour
 
     /// <summary>
     /// Parents the panel to the camera and matches its size to the frustum.
+    /// Uses camera ViewportToWorldPoint to guarantee perfect edge fitting across all
+    /// physical lens settings, aspect ratios, and mobile resolutions.
     /// </summary>
     void Apply()
     {
@@ -60,28 +62,36 @@ public class MenuCameraHUD : MonoBehaviour
         if (transform.parent != targetCamera.transform)
             transform.SetParent(targetCamera.transform, false);
 
-        Vector3 wantedPosition = new Vector3(0f, 0f, distance);
-        if (transform.localPosition != wantedPosition) transform.localPosition = wantedPosition;
-        if (transform.localRotation != Quaternion.identity) transform.localRotation = Quaternion.identity;
+        // Calculate exact viewport bounds at panel distance
+        Vector3 blWorld = targetCamera.ViewportToWorldPoint(new Vector3(0f, 0f, distance));
+        Vector3 trWorld = targetCamera.ViewportToWorldPoint(new Vector3(1f, 1f, distance));
 
-        float aspect = CurrentAspect(targetCamera);
+        Vector3 blLocal = targetCamera.transform.InverseTransformPoint(blWorld);
+        Vector3 trLocal = targetCamera.transform.InverseTransformPoint(trWorld);
 
-        // Virtual resolution of the menu. It never gets bigger than the render
-        // target, otherwise the panel would not fit inside the UI Toolkit panel.
-        float pixelHeight = targetCamera.pixelHeight;
-        if (pixelHeight <= 0f) pixelHeight = referenceHeight;
-        pixelHeight = Mathf.Min(referenceHeight, pixelHeight);
-        float pixelWidth = pixelHeight * aspect;
+        float viewWidth = Mathf.Abs(trLocal.x - blLocal.x);
+        float viewHeight = Mathf.Abs(trLocal.y - blLocal.y);
+        Vector3 centerLocal = (blLocal + trLocal) * 0.5f;
 
-        // keep the virtual resolution in sync with the screen so nothing is stretched
+        // Apply a 1% overscan so the world space layer stretches seamlessly to all edges
+        viewWidth *= 1.01f;
+        viewHeight *= 1.01f;
+
+        float screenAspect = viewWidth / Mathf.Max(0.001f, viewHeight);
+        float pixelHeight = targetCamera.pixelHeight > 0f ? targetCamera.pixelHeight : referenceHeight;
+        float pixelWidth = pixelHeight * screenAspect;
+
         if (document.worldSpaceSizeMode == WorldSpaceSizeMode.Fixed &&
             (document.worldSpaceSize.x != pixelWidth || document.worldSpaceSize.y != pixelHeight))
         {
             document.worldSpaceSize = new Vector2(pixelWidth, pixelHeight);
         }
 
-        float viewHeight = 2f * distance * Mathf.Tan(targetCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-        float viewWidth = viewHeight * aspect;
+        document.pivot = Pivot.Center;
+        document.pivotReferenceSize = PivotReferenceSize.Fixed;
+
+        if (transform.localPosition != centerLocal) transform.localPosition = centerLocal;
+        if (transform.localRotation != Quaternion.identity) transform.localRotation = Quaternion.identity;
 
         Vector3 wantedScale = new Vector3(
             viewWidth * pixelsPerUnit / pixelWidth,

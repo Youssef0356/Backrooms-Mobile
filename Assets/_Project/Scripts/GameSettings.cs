@@ -46,6 +46,8 @@ public static class GameSettings
     public static int QualityLevel => quality;
     public static int TargetFrameRate => targetFrameRate;
 
+    public static event System.Action<float> OnSensitivityChanged;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Bootstrap()
     {
@@ -99,7 +101,8 @@ public static class GameSettings
         sensitivity = Mathf.Clamp(value, 0.1f, 2f);
         PlayerPrefs.SetFloat(SensitivityKey, sensitivity);
         Save();
-        // FirstPersonController picks this up on its next Awake (scene start).
+        OnSensitivityChanged?.Invoke(sensitivity);
+        StarterAssets.TouchscreenInput.SetGlobalSensitivity(sensitivity);
     }
 
     public static void SetBrightness(float value)

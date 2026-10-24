@@ -43,7 +43,11 @@ public class MainMenuController : MonoBehaviour
     Label sensitivityValueLabel;
     Label brightnessValueLabel;
     Label recLabel;
+    Label hintLabel;
     VisualElement scanlines;
+    VisualElement leftColumn;
+    VisualElement versionBlock;
+    VisualElement statusBlock;
 
     Button playButton;
     Button settingsButton;
@@ -51,15 +55,23 @@ public class MainMenuController : MonoBehaviour
     Button quitButton;
     Button settingsCloseButton;
     Button controlsCloseButton;
+    Button tabTouch;
+    Button tabKeyboard;
 
     VisualElement settingsPanel;
     VisualElement controlsPanel;
+    VisualElement touchContainer;
+    VisualElement keyboardContainer;
     Slider volumeSlider;
     Slider musicSlider;
     Slider sensitivitySlider;
     Slider brightnessSlider;
     DropdownField graphicsDropdown;
     DropdownField framerateDropdown;
+
+    Rect appliedSafeArea;
+    int appliedScreenWidth;
+    int appliedScreenHeight;
 
     string titleText;
     Coroutine flickerRoutine;
@@ -78,7 +90,11 @@ public class MainMenuController : MonoBehaviour
         sensitivityValueLabel = root.Q<Label>("sensitivity-value");
         brightnessValueLabel = root.Q<Label>("brightness-value");
         recLabel = root.Q<Label>("rec-label");
+        hintLabel = root.Q<Label>("hint");
         scanlines = root.Q<VisualElement>("fx-scanlines");
+        leftColumn = root.Q<VisualElement>("left-column");
+        versionBlock = root.Q<VisualElement>("version-block");
+        statusBlock = root.Q<VisualElement>("status-block");
 
         playButton = root.Q<Button>("play-button");
         settingsButton = root.Q<Button>("settings-button");
@@ -86,9 +102,13 @@ public class MainMenuController : MonoBehaviour
         quitButton = root.Q<Button>("quit-button");
         settingsCloseButton = root.Q<Button>("settings-close-button");
         controlsCloseButton = root.Q<Button>("controls-close-button");
+        tabTouch = root.Q<Button>("tab-touch");
+        tabKeyboard = root.Q<Button>("tab-keyboard");
 
         settingsPanel = root.Q<VisualElement>("settings-panel");
         controlsPanel = root.Q<VisualElement>("controls-panel");
+        touchContainer = root.Q<VisualElement>("touch-controls-container");
+        keyboardContainer = root.Q<VisualElement>("keyboard-controls-container");
         volumeSlider = root.Q<Slider>("volume-slider");
         musicSlider = root.Q<Slider>("music-slider");
         sensitivitySlider = root.Q<Slider>("sensitivity-slider");
@@ -161,6 +181,33 @@ public class MainMenuController : MonoBehaviour
 
         if (settingsCloseButton != null) settingsCloseButton.clicked += CloseSettings;
         if (controlsCloseButton != null) controlsCloseButton.clicked += CloseControls;
+
+        if (tabTouch != null) tabTouch.clicked += () => SwitchControlsTab(touchMode: true);
+        if (tabKeyboard != null) tabKeyboard.clicked += () => SwitchControlsTab(touchMode: false);
+
+        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
+        SwitchControlsTab(touchMode: isMobile);
+
+        if (hintLabel != null && isMobile)
+            hintLabel.text = "TAP A CHOICE TO SELECT";
+    }
+
+    void SwitchControlsTab(bool touchMode)
+    {
+        if (touchMode)
+        {
+            tabTouch?.AddToClassList("is-tab-active");
+            tabKeyboard?.RemoveFromClassList("is-tab-active");
+            touchContainer?.RemoveFromClassList("is-hidden");
+            keyboardContainer?.AddToClassList("is-hidden");
+        }
+        else
+        {
+            tabKeyboard?.AddToClassList("is-tab-active");
+            tabTouch?.RemoveFromClassList("is-tab-active");
+            keyboardContainer?.RemoveFromClassList("is-hidden");
+            touchContainer?.AddToClassList("is-hidden");
+        }
     }
 
     void WireButtonRow(Button button, System.Action onClick)
@@ -482,6 +529,54 @@ public class MainMenuController : MonoBehaviour
         {
             bool blink = Mathf.Repeat(Time.unscaledTime, 1.2f) < 0.75f;
             recLabel.style.opacity = blink ? 1f : 0.25f;
+        }
+
+        UpdateSafeArea();
+    }
+
+    void UpdateSafeArea()
+    {
+        Rect safeArea = Screen.safeArea;
+        if (safeArea.width <= 0f || safeArea.height <= 0f)
+            safeArea = new Rect(0f, 0f, Screen.width, Screen.height);
+
+        if (safeArea == appliedSafeArea &&
+            Screen.width == appliedScreenWidth &&
+            Screen.height == appliedScreenHeight)
+            return;
+
+        if (root == null) return;
+        float panelWidth = root.resolvedStyle.width;
+        float panelHeight = root.resolvedStyle.height;
+        if (float.IsNaN(panelWidth) || float.IsNaN(panelHeight) ||
+            panelWidth <= 0f || panelHeight <= 0f)
+            return;
+
+        appliedSafeArea = safeArea;
+        appliedScreenWidth = Screen.width;
+        appliedScreenHeight = Screen.height;
+
+        float toPanelX = panelWidth / Mathf.Max(1f, Screen.width);
+        float toPanelY = panelHeight / Mathf.Max(1f, Screen.height);
+
+        float insetLeft = Mathf.Max(0f, safeArea.xMin * toPanelX);
+        float insetRight = Mathf.Max(0f, (Screen.width - safeArea.xMax) * toPanelX);
+        float insetTop = Mathf.Max(0f, (Screen.height - safeArea.yMax) * toPanelY);
+        float insetBottom = Mathf.Max(0f, safeArea.yMin * toPanelY);
+
+        if (leftColumn != null)
+            leftColumn.style.left = 80f + insetLeft;
+
+        if (versionBlock != null)
+        {
+            versionBlock.style.right = 46f + insetRight;
+            versionBlock.style.top = 34f + insetTop;
+        }
+
+        if (statusBlock != null)
+        {
+            statusBlock.style.left = 64f + insetLeft;
+            statusBlock.style.bottom = 30f + insetBottom;
         }
     }
 }

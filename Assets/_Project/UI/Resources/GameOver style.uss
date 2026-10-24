@@ -34,6 +34,34 @@
     text-shadow: 0 0 0 rgba(0, 0, 0, 0);
 }
 
+/* ============================== full-screen bloody layers ================= */
+
+.gameover-blood-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.25s;
+    transition-timing-function: ease-out;
+}
+
+.gameover-pain-flash {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(220, 20, 20, 0.75);
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.15s;
+    transition-timing-function: ease-out;
+}
+
 /* ============================== full-screen backdrop ===================== */
 
 .gameover-backdrop {
@@ -42,7 +70,7 @@
     top: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(10, 3, 3, 0.88);
+    background-color: rgba(10, 3, 3, 0.82);
     align-items: center;
     justify-content: center;
     opacity: 0;
@@ -101,12 +129,12 @@
 /* ============================== central modal card ======================== */
 
 .gameover-card {
-    width: 600px;
+    width: 620px;
     max-width: 90%;
     padding: 34px 40px;
     background-color: var(--card-bg);
-    border-width: 1px;
-    border-color: var(--danger-line);
+    border-width: 2px;
+    border-color: rgba(225, 45, 40, 0.65);
     flex-direction: column;
 }
 
@@ -115,6 +143,7 @@
     letter-spacing: 12px;
     -unity-font-style: bold;
     color: var(--danger-bright);
+    text-shadow: 0 0 16px rgba(255, 40, 40, 0.7);
     -unity-text-align: middle-center;
 }
 

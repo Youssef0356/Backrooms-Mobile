@@ -39,20 +39,22 @@
 
 .fx-scrim {
     position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
+    left: -2px;
+    top: -2px;
+    right: -2px;
+    bottom: -2px;
+    -unity-background-scale-mode: stretch-to-fill;
     /* left-side scrim baked into a texture: USS has no gradient functions */
     background-image: url("../Art/UI/scrim.png");
 }
 
 .fx-scanlines {
     position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
+    left: -2px;
+    top: -2px;
+    right: -2px;
+    bottom: -2px;
+    -unity-background-scale-mode: stretch-to-fill;
     /* 1px line / 3px gap scanlines + flat base baked into a texture
        (USS has no repeating-linear-gradient support) */
     background-image: url("../Art/UI/scanlines.png");
@@ -60,10 +62,11 @@
 
 .fx-vignette {
     position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
+    left: -2px;
+    top: -2px;
+    right: -2px;
+    bottom: -2px;
+    -unity-background-scale-mode: stretch-to-fill;
     /* radial edge darkening baked into a texture (USS has no gradient
        functions); the old flat rgba(0,0,0,0.18) base is merged into it */
     background-image: url("../Art/UI/vignette.png");
@@ -455,4 +458,43 @@
     letter-spacing: 3px;
     color: var(--muted);
     -unity-text-align: middle-left;
+}
+
+/* ============================== controls tabs ============================= */
+
+.controls-tab-bar {
+    flex-direction: row;
+    margin-top: 10px;
+    margin-bottom: 12px;
+}
+
+.controls-tab-btn {
+    flex-grow: 1;
+    height: 44px;
+    font-size: 16px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    color: var(--muted);
+    background-color: rgba(223, 216, 118, 0.05);
+    border-width: 1px;
+    border-color: var(--line);
+    border-radius: 4px;
+    margin-right: 6px;
+    transition-property: background-color, color, border-color;
+    transition-duration: 0.12s;
+}
+
+.controls-tab-btn:hover {
+    background-color: rgba(223, 216, 118, 0.14);
+    color: var(--text);
+}
+
+.controls-tab-btn.is-tab-active {
+    background-color: rgba(223, 216, 118, 0.22);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.controls-container {
+    flex-direction: column;
 }

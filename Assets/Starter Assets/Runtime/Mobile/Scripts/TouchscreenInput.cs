@@ -40,6 +40,13 @@ namespace StarterAssets
             OnFlashlightStateChanged?.Invoke(on);
         }
 
+        // Global sensitivity cross-assembly bridge
+        public static event Action<float> OnSensitivityMultiplierChanged;
+        public static void SetGlobalSensitivity(float val)
+        {
+            OnSensitivityMultiplierChanged?.Invoke(val);
+        }
+
         private UIDocument m_Document;
         private VirtualJoystick m_MoveJoystick;
         private VirtualJoystick m_LookJoystick;
@@ -52,6 +59,8 @@ namespace StarterAssets
         private void Awake()
         {
             m_Document = GetComponent<UIDocument>();
+
+            TouchSensitivity = Mathf.Clamp(PlayerPrefs.GetFloat("backrooms.sensitivity", 1f), 0.1f, 2f);
 
             var safeArea = Screen.safeArea;
             var root = m_Document.rootVisualElement;
@@ -127,12 +136,19 @@ namespace StarterAssets
         {
             OnFlashlightStateChanged += UpdateFlashlightVisual;
             UpdateFlashlightVisual(IsFlashlightOn);
+            OnSensitivityMultiplierChanged += HandleSensitivityChanged;
         }
 
         private void OnDisable()
         {
             OnFlashlightStateChanged -= UpdateFlashlightVisual;
+            OnSensitivityMultiplierChanged -= HandleSensitivityChanged;
             ResetLookTouch();
+        }
+
+        private void HandleSensitivityChanged(float val)
+        {
+            TouchSensitivity = Mathf.Clamp(val, 0.1f, 2f);
         }
 
         private VisualElement m_FlashlightButton;

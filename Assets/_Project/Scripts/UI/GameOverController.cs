@@ -27,10 +27,10 @@ public class GameOverController : MonoBehaviour
 
     [Header("Timing & Jumpscare")]
     [Tooltip("Delay in seconds between being caught and showing the UI (plays attack/turn).")]
-    [SerializeField] float caughtDelay = 2.2f;
+    [SerializeField] float caughtDelay = 2.4f;
     [Tooltip("If true, turns the camera to face the entity when caught.")]
     [SerializeField] bool lookAtKiller = true;
-    [SerializeField] float cameraTurnSpeed = 10f;
+    [SerializeField] float cameraTurnSpeed = 12f;
 
     [Header("Audio")]
     [Tooltip("Sound played upon defeat. If null, picks a monster composition clip.")]
@@ -46,11 +46,11 @@ public class GameOverController : MonoBehaviour
     [SerializeField] string menuSceneName = "Menu";
 
     [Header("Labels & Text")]
-    [SerializeField] string headingLabel = "SIGNAL LOST";
-    [SerializeField] string subtitleLabel = "ANOMALOUS ENTITY CONTACT - VITAL SIGNS ZERO";
+    [SerializeField] string headingLabel = "SIGNAL TERMINATED";
+    [SerializeField] string subtitleLabel = "ANOMALOUS ENTITY CONTACT // TRAUMATIC TERMINATION";
     [SerializeField] string retryButtonLabel = "RE-ENTER LEVEL";
     [SerializeField] string menuButtonLabel = "RETURN TO MENU";
-    [SerializeField] string threatName = "ENTITY-001 (BACTERIA)";
+    [SerializeField] string threatName = "ENTITY-001 (PIRATE CLARK)";
 
     [Header("Look & Fonts")]
     [SerializeField] Font uiFont;
@@ -64,6 +64,9 @@ public class GameOverController : MonoBehaviour
     VisualElement root;
     VisualElement backdrop;
     VisualElement card;
+    VisualElement bloodOverlay;
+    VisualElement painFlashOverlay;
+    Texture2D bloodTexture;
     Label recBadge;
     Label timeStatLabel;
     Button retryButton;
@@ -101,6 +104,7 @@ public class GameOverController : MonoBehaviour
 
         StopAllCoroutines();
         if (audioSource != null) audioSource.Stop();
+        if (bloodTexture != null) Destroy(bloodTexture);
 
         RestoreCursor();
     }
@@ -161,6 +165,7 @@ public class GameOverController : MonoBehaviour
     {
         Camera mainCam = Camera.main;
         if (mainCam == null) mainCam = FindAnyObjectByType<Camera>();
+        Transform cam = mainCam != null ? mainCam.transform : null;
 
         // 1. Release Cinemachine control so we have complete authority over the Main Camera
         if (mainCam != null)
@@ -175,64 +180,152 @@ public class GameOverController : MonoBehaviour
         // Trigger maximum VHS glitch and static distortion for the jumpscare
         CameraVHSGlitch.TriggerKillBurst();
 
-        // 2. Orient killer toward the camera and trigger the kill attack animation
+        Transform killerHead = null;
         if (killer != null && mainCam != null)
         {
-            Vector3 toCam = mainCam.transform.position - killer.position;
+            killerHead = FindHeadBone(killer);
+
+            // Nudge killer to stand directly in front of the camera (1.15m away) for maximum jumpscare impact
+            Vector3 toKiller = killer.position - cam.position;
+            toKiller.y = 0f;
+            float currentDist = toKiller.magnitude;
+            if (currentDist > 1.35f || currentDist < 0.75f)
+            {
+                Vector3 desiredPos = cam.position + (currentDist > 0.1f ? toKiller.normalized : cam.forward) * 1.15f;
+                desiredPos.y = killer.position.y;
+                if (UnityEngine.AI.NavMesh.SamplePosition(desiredPos, out UnityEngine.AI.NavMeshHit navHit, 1.6f, UnityEngine.AI.NavMesh.AllAreas))
+                {
+                    killer.position = navHit.position;
+                }
+            }
+
+            // Orient killer directly toward the player camera
+            Vector3 toCam = cam.position - killer.position;
             toCam.y = 0f;
             if (toCam.sqrMagnitude > 0.01f)
             {
                 killer.rotation = Quaternion.LookRotation(toCam);
             }
 
+            // Immediately launch the attack animation right at the camera
             Animator anim = killer.GetComponentInChildren<Animator>();
             if (anim != null)
             {
                 anim.speed = 1f;
-                anim.SetTrigger("Attack1");
+                anim.Play("Attack 1", 0, 0f);
             }
         }
 
-        // 3. Jumpscare Camera Choreography (Snap to eyes, dolly in, tremor, lethal strike, floor collapse)
+        Vector3 startCamPos = cam != null ? cam.position : Vector3.zero;
+        float totalDuration = Mathf.Max(caughtDelay, 2.4f);
+        float impactTime = 0.52f; // Time when monster's strike connects with player's face
+        bool impactTriggered = false;
+
+        float timer = 0f;
+
         if (mainCam != null && killer != null)
         {
-            Transform cam = mainCam.transform;
-            Vector3 killerHead = killer.position + Vector3.up * 1.55f;
-            Vector3 startPos = cam.position;
-            Vector3 dollyTarget = killer.position + (startPos - killer.position).normalized * 1.05f + Vector3.up * 1.5f;
-
-            float timer = 0f;
-
-            while (timer < caughtDelay)
+            while (timer < totalDuration)
             {
                 float dt = Time.unscaledDeltaTime;
                 timer += dt;
 
-                if (timer < 1.15f)
+                Vector3 facePos = killerHead != null ? killerHead.position : (killer.position + Vector3.up * 1.55f);
+
+                if (timer < impactTime)
                 {
-                    // Phase 1: Snap view into Clark's face and lunge forward toward him
+                    // =========================================================================
+                    // PHASE 1: Jumpscare Snap into Monster's Face + Looming Dread Tremor
+                    // =========================================================================
+                    float phaseProgress = Mathf.Clamp01(timer / impactTime);
+
+                    // Whip-pan rotation directly into Clark's face/eyes
                     if (lookAtKiller)
                     {
-                        Vector3 lookDir = killerHead - cam.position;
+                        Vector3 lookDir = (facePos - cam.position).normalized;
                         if (lookDir.sqrMagnitude > 0.01f)
                         {
-                            Quaternion lookRot = Quaternion.LookRotation(lookDir);
-                            cam.rotation = Quaternion.Slerp(cam.rotation, lookRot, dt * cameraTurnSpeed);
+                            Quaternion targetRot = Quaternion.LookRotation(lookDir);
+                            cam.rotation = Quaternion.Slerp(cam.rotation, targetRot, dt * cameraTurnSpeed * 1.6f);
                         }
                     }
 
-                    cam.position = Vector3.MoveTowards(cam.position, dollyTarget, dt * 2.4f);
+                    // Smooth dolly in toward the face
+                    Vector3 forwardDir = (facePos - cam.position).normalized;
+                    Vector3 dollyTarget = facePos - forwardDir * 0.95f;
+                    cam.position = Vector3.MoveTowards(cam.position, dollyTarget, dt * 2.2f);
 
-                    // Violent head tremor
-                    Vector3 tremor = UnityEngine.Random.insideUnitSphere * (0.035f * (1.2f - timer));
+                    // High-frequency fear shivering tremor
+                    float shiver = (1f - phaseProgress) * 0.025f;
+                    Vector3 tremor = (Mathf.Sin(timer * 55f) * cam.right + Mathf.Cos(timer * 65f) * cam.up) * shiver;
                     cam.position += tremor;
                 }
                 else
                 {
-                    // Phase 2: Kill impact! Clark's strike hits the camera and player collapses
-                    Quaternion collapseRot = Quaternion.Euler(68f, cam.rotation.eulerAngles.y + 20f, 25f);
-                    cam.rotation = Quaternion.Slerp(cam.rotation, collapseRot, dt * 7f);
-                    cam.position = Vector3.MoveTowards(cam.position, new Vector3(cam.position.x, 0.28f, cam.position.z), dt * 3.8f);
+                    // =========================================================================
+                    // PHASE 2 & 3: LETHAL STRIKE IMPACT & VIOLENT SCREEN SHAKE & FLOOR COLLAPSE
+                    // =========================================================================
+                    if (!impactTriggered)
+                    {
+                        impactTriggered = true;
+
+                        // Trigger red pain flash & reveal bloody overlay on the lens
+                        if (painFlashOverlay != null)
+                        {
+                            painFlashOverlay.style.display = DisplayStyle.Flex;
+                            painFlashOverlay.style.opacity = 1f;
+                        }
+                        if (bloodOverlay != null)
+                        {
+                            bloodOverlay.style.display = DisplayStyle.Flex;
+                            bloodOverlay.style.opacity = 1f;
+                        }
+
+                        // Play impact thud
+                        AudioClip landClip = Resources.Load<AudioClip>("SFX/Footsteps/Player_Land");
+                        if (landClip != null && audioSource != null)
+                        {
+                            audioSource.PlayOneShot(landClip, 1.0f);
+                        }
+                    }
+
+                    // Fade out pain flash quickly (leaves the bloody vignette and spatters behind)
+                    if (painFlashOverlay != null)
+                    {
+                        float flashFade = Mathf.Clamp01((timer - impactTime) / 0.35f);
+                        painFlashOverlay.style.opacity = 1f - flashFade;
+                        if (flashFade >= 1f) painFlashOverlay.style.display = DisplayStyle.None;
+                    }
+
+                    float timeSinceImpact = timer - impactTime;
+
+                    // Violent screen shake trauma that decays smoothly over 0.65s
+                    float trauma = Mathf.Clamp01(1f - (timeSinceImpact / 0.65f));
+                    trauma = trauma * trauma; // exponential decay
+
+                    // High-intensity rotational jolt (pitch head whip-back, roll tilt, yaw recoil)
+                    float shakeYaw = Mathf.Sin(timer * 38f) * 16f * trauma;
+                    float shakePitch = (Mathf.Cos(timer * 44f) * 12f - 14f) * trauma; // recoil back
+                    float shakeRoll = Mathf.Sin(timer * 32f) * 22f * trauma;
+
+                    // Player body collapse towards carpet floor
+                    float collapseProgress = Mathf.Clamp01((timeSinceImpact - 0.15f) / 1.1f);
+                    float floorY = Mathf.Max(startCamPos.y - 1.32f, 0.22f);
+                    float currentY = Mathf.Lerp(cam.position.y, floorY, collapseProgress);
+
+                    // Dutch angle as the player's head rests on the floor
+                    float deathRoll = Mathf.Lerp(0f, 68f, collapseProgress);
+                    float deathPitch = Mathf.Lerp(0f, 25f, collapseProgress);
+
+                    Vector3 lookDir = (facePos - cam.position).normalized;
+                    Quaternion baseRot = Quaternion.LookRotation(lookDir);
+                    Quaternion shakeRot = Quaternion.Euler(shakePitch + deathPitch, shakeYaw, shakeRoll + deathRoll);
+
+                    cam.rotation = Quaternion.Slerp(cam.rotation, baseRot * shakeRot, dt * 14f);
+
+                    // Positional shake impulse
+                    Vector3 shakePos = (cam.right * Mathf.Sin(timer * 40f) + cam.up * Mathf.Cos(timer * 50f)) * (0.065f * trauma);
+                    cam.position = new Vector3(cam.position.x, currentY, cam.position.z) + shakePos;
                 }
 
                 yield return null;
@@ -244,6 +337,28 @@ public class GameOverController : MonoBehaviour
         }
 
         ShowGameOverUI();
+    }
+
+    Transform FindHeadBone(Transform root)
+    {
+        if (root == null) return null;
+        return FindChildRecursive(root, "head", "neck", "spine_03", "spine.003", "spine_02");
+    }
+
+    Transform FindChildRecursive(Transform parent, params string[] names)
+    {
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            string lowerName = child.name.ToLowerInvariant();
+            foreach (string n in names)
+            {
+                if (lowerName.Contains(n)) return child;
+            }
+            Transform found = FindChildRecursive(child, names);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     void ShowGameOverUI()
@@ -271,9 +386,11 @@ public class GameOverController : MonoBehaviour
         while (IsGameOver && recBadge != null)
         {
             recBadge.style.opacity = 1f;
+            if (bloodOverlay != null) bloodOverlay.style.opacity = 1f;
             yield return new WaitForSecondsRealtime(0.6f);
             if (!IsGameOver) break;
             recBadge.style.opacity = 0.15f;
+            if (bloodOverlay != null) bloodOverlay.style.opacity = 0.82f;
             yield return new WaitForSecondsRealtime(0.4f);
         }
     }
@@ -410,6 +527,23 @@ public class GameOverController : MonoBehaviour
         if (sheet != null) root.styleSheets.Add(sheet);
         else Debug.LogWarning("GameOverController: stylesheet not found at " + styleResourcePath, this);
 
+        // Bloody Vignette & Splatters Layer
+        bloodOverlay = new VisualElement();
+        bloodOverlay.AddToClassList("gameover-blood-overlay");
+        bloodOverlay.style.display = DisplayStyle.None;
+        bloodTexture = CreateBloodyVignetteTexture(512, 512);
+        if (bloodTexture != null)
+        {
+            bloodOverlay.style.backgroundImage = new StyleBackground(bloodTexture);
+        }
+        root.Add(bloodOverlay);
+
+        // Pain Flash Layer (flashes bright red upon lethal strike)
+        painFlashOverlay = new VisualElement();
+        painFlashOverlay.AddToClassList("gameover-pain-flash");
+        painFlashOverlay.style.display = DisplayStyle.None;
+        root.Add(painFlashOverlay);
+
         // Backdrop
         backdrop = new VisualElement();
         backdrop.AddToClassList("gameover-backdrop");
@@ -426,7 +560,7 @@ public class GameOverController : MonoBehaviour
         backdrop.Add(scanlines);
 
         // Top badges
-        recBadge = MakeLabel("● REC [SIGNAL LOST]", "gameover-rec-badge");
+        recBadge = MakeLabel("● REC [SIGNAL TERMINATED]", "gameover-rec-badge");
         backdrop.Add(recBadge);
 
         Label chBadge = MakeLabel("CAM_01 // LEVEL_0", "gameover-channel-badge");
@@ -451,7 +585,8 @@ public class GameOverController : MonoBehaviour
 
         statsBox.Add(BuildStatRow("ZONE", "LEVEL 0 - THE LOBBY"));
         statsBox.Add(BuildStatRow("THREAT", threatName));
-        statsBox.Add(BuildStatRow("STATUS", "VITAL SIGNS TERMINATED", isDanger: true));
+        statsBox.Add(BuildStatRow("TRAUMA", "FATAL CRANIAL IMPACT", isDanger: true));
+        statsBox.Add(BuildStatRow("VITALS", "000 BPM [ASYSTOLE]", isDanger: true));
 
         VisualElement timeRow = new VisualElement();
         timeRow.AddToClassList("gameover-stat-row");
@@ -466,6 +601,139 @@ public class GameOverController : MonoBehaviour
 
         menuButton = MakeButton(menuButtonLabel, OnMenuClicked, secondary: true);
         card.Add(menuButton);
+    }
+
+    Texture2D CreateBloodyVignetteTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        tex.name = "ProceduralBloodVignette";
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        Color32[] pixels = new Color32[width * height];
+        Color32 deepCrimson = new Color32(115, 8, 8, 255);
+        Color32 arterialRed = new Color32(195, 14, 14, 255);
+        Color32 coagulated = new Color32(48, 4, 4, 255);
+
+        // 1. Organic bloody vignette from edges
+        for (int y = 0; y < height; y++)
+        {
+            float ny = (float)y / height;
+            float dy = Mathf.Min(ny, 1f - ny) * 2f;
+
+            for (int x = 0; x < width; x++)
+            {
+                float nx = (float)x / width;
+                float dx = Mathf.Min(nx, 1f - nx) * 2f;
+
+                float edgeDist = Mathf.Min(dx, dy);
+
+                float noise = Mathf.PerlinNoise(nx * 6.5f, ny * 6.5f) * 0.35f +
+                              Mathf.PerlinNoise(nx * 14f, ny * 14f) * 0.15f;
+
+                float threshold = 0.52f + noise;
+                float alpha = 0f;
+
+                if (edgeDist < threshold)
+                {
+                    alpha = Mathf.Clamp01((threshold - edgeDist) / threshold);
+                    alpha = Mathf.Pow(alpha, 1.5f) * 0.95f;
+                }
+
+                if (alpha > 0.01f)
+                {
+                    float colorTone = Mathf.PerlinNoise(nx * 9f, ny * 9f);
+                    Color32 baseColor = Color32.Lerp(deepCrimson, arterialRed, colorTone);
+                    if (noise > 0.32f) baseColor = Color32.Lerp(baseColor, coagulated, 0.55f);
+                    baseColor.a = (byte)(alpha * 255);
+                    pixels[y * width + x] = baseColor;
+                }
+                else
+                {
+                    pixels[y * width + x] = new Color32(0, 0, 0, 0);
+                }
+            }
+        }
+
+        // 2. Add blood drip streaks running down from top
+        int numDrips = 12;
+        for (int d = 0; d < numDrips; d++)
+        {
+            int startX = (int)(Mathf.PerlinNoise(d * 1.7f, 0.35f) * (width - 60) + 30);
+            int dripLength = (int)(Mathf.PerlinNoise(d * 2.3f, 0.75f) * (height * 0.42f) + height * 0.12f);
+            int dripWidth = (int)(Mathf.PerlinNoise(d * 3.1f, 1.15f) * 6f + 4f);
+
+            for (int dy = 0; dy < dripLength; dy++)
+            {
+                int py = height - 1 - dy;
+                if (py < 0 || py >= height) continue;
+
+                float prog = (float)dy / dripLength;
+                float currentWidth = Mathf.Lerp(dripWidth, 1.5f, prog);
+                if (prog > 0.82f) currentWidth = Mathf.Lerp(1.5f, dripWidth * 1.35f, (prog - 0.82f) / 0.18f);
+
+                int w = Mathf.Max(1, (int)currentWidth);
+                for (int px = startX - w; px <= startX + w; px++)
+                {
+                    if (px < 0 || px >= width) continue;
+                    float distFromCenter = Mathf.Abs(px - startX) / (float)w;
+                    float alpha = Mathf.Clamp01(1f - distFromCenter);
+                    int idx = py * width + px;
+                    Color32 existing = pixels[idx];
+                    byte newAlpha = (byte)Mathf.Max(existing.a, (byte)(alpha * 235));
+                    pixels[idx] = new Color32(arterialRed.r, arterialRed.g, arterialRed.b, newAlpha);
+                }
+            }
+        }
+
+        // 3. Add blood splatter clusters (impact droplets)
+        int numSplats = 8;
+        for (int s = 0; s < numSplats; s++)
+        {
+            float cx = Mathf.PerlinNoise(s * 3.7f, 4.2f) * (width * 0.8f) + width * 0.1f;
+            float cy = Mathf.PerlinNoise(s * 5.1f, 2.9f) * (height * 0.8f) + height * 0.1f;
+            float radius = Mathf.PerlinNoise(s * 2.4f, 1.8f) * 24f + 14f;
+
+            DrawCircle(pixels, width, height, (int)cx, (int)cy, (int)radius, deepCrimson);
+
+            int numDroplets = (int)(radius * 0.75f);
+            for (int i = 0; i < numDroplets; i++)
+            {
+                float angle = (float)i / numDroplets * Mathf.PI * 2f + Mathf.PerlinNoise(i, s) * 0.8f;
+                float dist = radius * (1.2f + Mathf.PerlinNoise(i * 1.5f, s * 2f) * 2.2f);
+                int dropX = (int)(cx + Mathf.Cos(angle) * dist);
+                int dropY = (int)(cy + Mathf.Sin(angle) * dist);
+                int dropRadius = Mathf.Max(1, (int)(radius * 0.18f * (1f - dist / (radius * 3.5f))));
+                DrawCircle(pixels, width, height, dropX, dropY, dropRadius, arterialRed);
+            }
+        }
+
+        tex.SetPixels32(pixels);
+        tex.Apply(false, true);
+        return tex;
+    }
+
+    void DrawCircle(Color32[] pixels, int width, int height, int cx, int cy, int radius, Color32 color)
+    {
+        int r2 = radius * radius;
+        for (int y = -radius; y <= radius; y++)
+        {
+            int py = cy + y;
+            if (py < 0 || py >= height) continue;
+            for (int x = -radius; x <= radius; x++)
+            {
+                int px = cx + x;
+                if (px < 0 || px >= width) continue;
+                int d2 = x * x + y * y;
+                if (d2 <= r2)
+                {
+                    float a = Mathf.Clamp01(1f - Mathf.Sqrt(d2) / (float)radius);
+                    int idx = py * width + px;
+                    byte finalA = (byte)Mathf.Max(pixels[idx].a, (byte)(a * 240));
+                    pixels[idx] = new Color32(color.r, color.g, color.b, finalA);
+                }
+            }
+        }
     }
 
     VisualElement BuildStatRow(string labelText, string valueText, bool isDanger = false)

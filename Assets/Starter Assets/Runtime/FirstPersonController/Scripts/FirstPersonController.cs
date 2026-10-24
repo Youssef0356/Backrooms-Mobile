@@ -107,6 +107,21 @@ namespace StarterAssets
 			}
 		}
 
+		private void OnEnable()
+		{
+			TouchscreenInput.OnSensitivityMultiplierChanged += HandleSensitivityChanged;
+		}
+
+		private void OnDisable()
+		{
+			TouchscreenInput.OnSensitivityMultiplierChanged -= HandleSensitivityChanged;
+		}
+
+		private void HandleSensitivityChanged(float val)
+		{
+			_sensitivity = Mathf.Clamp(val, 0.1f, 2f);
+		}
+
 		private void Start()
 		{
 			_controller = GetComponent<CharacterController>();
@@ -212,7 +227,10 @@ namespace StarterAssets
 			}
 
 			// move the player
-			_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+			if (_controller != null && _controller.enabled)
+			{
+				_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+			}
 		}
 
 		private void JumpAndGravity()

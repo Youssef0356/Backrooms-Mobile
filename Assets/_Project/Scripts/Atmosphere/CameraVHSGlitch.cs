@@ -18,6 +18,8 @@ public class CameraVHSGlitch : MonoBehaviour
     public Transform villain;
 
     [Header("Distance Tuning")]
+    [Tooltip("Whether the screen glitches as the villain approaches the player. Set to false to disable proximity glitching.")]
+    public bool enableProximityGlitch = false;
     [Tooltip("Distance at which subtle glitching begins (metres).")]
     public float maxGlitchDistance = 16f;
     [Tooltip("Distance at which heavy screen tearing and static occurs (metres).")]
@@ -220,7 +222,7 @@ public class CameraVHSGlitch : MonoBehaviour
             new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(50f, -40f), new Vector2(300f, 60f));
 
         spText = CreateOSDLabel("SP_Label", osdContainer, font, osdColor, 26, TextAnchor.UpperRight,
-            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-50f, -40f), new Vector2(300f, 60f));
+            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-120f, -40f), new Vector2(300f, 60f));
         spText.text = "SP  [|||]";
 
         playText = CreateOSDLabel("PLAY_Label", osdContainer, font, osdColor, 26, TextAnchor.LowerLeft,
@@ -347,6 +349,12 @@ public class CameraVHSGlitch : MonoBehaviour
 
     void CalculateGlitchTarget()
     {
+        if (!enableProximityGlitch)
+        {
+            targetGlitch = 0f;
+            return;
+        }
+
         float dist = Vector3.Distance(player.position, villain.position);
 
         if (dist >= maxGlitchDistance)

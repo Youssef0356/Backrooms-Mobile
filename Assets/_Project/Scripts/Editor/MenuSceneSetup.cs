@@ -49,7 +49,7 @@ public static class MenuSceneSetup
         document.worldSpaceSizeMode = WorldSpaceSizeMode.Fixed;
         document.worldSpaceSize = new Vector2(1920f, 1080f);
         document.pivot = Pivot.Center;
-        document.pivotReferenceSize = PivotReferenceSize.Layout;
+        document.pivotReferenceSize = PivotReferenceSize.Fixed;
 
         // attach it to the camera
         Transform panel = document.transform;

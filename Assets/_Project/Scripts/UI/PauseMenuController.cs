@@ -46,16 +46,19 @@ public class PauseMenuController : MonoBehaviour
 
     // ------------------------------------------------------------- sliders
 
-    [Header("Volume sliders (live)")]
+    [Header("Settings rows (live)")]
     [SerializeField] bool showSoundSlider = true;
     [SerializeField] bool showMusicSlider = true;
+    [SerializeField] bool showSensitivitySlider = true;
+    [SerializeField] bool showGraphicsOption = true;
+    [SerializeField] bool showFrameRateOption = true;
+    [SerializeField] bool showControlsButton = true;
 
     // ------------------------------------------------------------- pause button
 
     [Header("Pause button (mobile)")]
     [Tooltip("Show the on-screen pause button in the top right corner.")]
     [SerializeField] bool showPauseButton = true;
-    [SerializeField] string pauseButtonLabel = "II";
 
     // ------------------------------------------------------------- labels
 
@@ -94,7 +97,7 @@ public class PauseMenuController : MonoBehaviour
 
     // Safe area tracking for corner HUD buttons (notch / camera cut-out / rounded corners).
     // Expressed in panel units, same space the stylesheet uses.
-    const float HudButtonMargin = 32f;
+    const float HudButtonMargin = 24f;
     Rect appliedSafeArea;
     int appliedScreenWidth;
     int appliedScreenHeight;
@@ -345,10 +348,13 @@ public class PauseMenuController : MonoBehaviour
         if (sheet != null) root.styleSheets.Add(sheet);
         else Debug.LogWarning("PauseMenuController: 'Resources/Pause menu style' stylesheet not found.", this);
 
-        // corner pause button
-        pauseButton = new Button(TogglePause) { text = pauseButtonLabel };
+        // corner pause / settings button
+        pauseButton = new Button(TogglePause);
         pauseButton.AddToClassList("pause-fab");
-        ApplyFont(pauseButton);
+        VisualElement gearIcon = new VisualElement();
+        gearIcon.AddToClassList("pause-fab-icon");
+        gearIcon.pickingMode = PickingMode.Ignore;
+        pauseButton.Add(gearIcon);
         root.Add(pauseButton);
 
         // overlay + card
@@ -376,6 +382,29 @@ public class PauseMenuController : MonoBehaviour
             card.Add(BuildSettingRow("MUSIC", GameSettings.MusicVolume, out _, out _,
                 ApplyMusicVolume));
 
+        if (showSensitivitySlider)
+            card.Add(BuildSettingRow("LOOK SENSITIVITY", GameSettings.Sensitivity, out _, out _,
+                v => GameSettings.SetSensitivity(v),
+                minValue: 10f, maxValue: 200f, isSensitivity: true));
+
+        if (showGraphicsOption)
+            card.Add(BuildGraphicsDropdown());
+
+        if (showFrameRateOption)
+            card.Add(BuildFrameRateDropdown());
+
+        VisualElement controlsCard = BuildControlsCard(card);
+        overlay.Add(controlsCard);
+
+        if (showControlsButton)
+        {
+            card.Add(MakeButton("CONTROLS", () =>
+            {
+                card.AddToClassList("is-hidden");
+                controlsCard.RemoveFromClassList("is-hidden");
+            }));
+        }
+
         card.Add(MakeDivider());
 
         card.Add(MakeButton(exitLabel, OnExitClicked, danger: true));
@@ -384,8 +413,9 @@ public class PauseMenuController : MonoBehaviour
     }
 
     /// A labelled slider row with a live percentage readout.
-    VisualElement BuildSettingRow(string labelText, float value01,
-        out Label valueLabel, out Slider slider, Action<float> onChanged)
+    VisualElement BuildSettingRow(string labelText, float initialValue,
+        out Label valueLabel, out Slider slider, Action<float> onChanged,
+        float minValue = 0f, float maxValue = 100f, bool isSensitivity = false)
     {
         VisualElement setting = new VisualElement();
         setting.AddToClassList("pause-setting");
@@ -396,24 +426,145 @@ public class PauseMenuController : MonoBehaviour
 
         row.Add(MakeLabel(labelText, "pause-setting-label"));
 
-        Label valueText = MakeLabel(Mathf.RoundToInt(value01 * 100f) + "%", "pause-setting-value");
+        float displayVal = isSensitivity ? initialValue * 100f : initialValue * 100f;
+        Label valueText = MakeLabel(Mathf.RoundToInt(displayVal) + "%", "pause-setting-value");
         row.Add(valueText);
         valueLabel = valueText;
 
-        Slider settingSlider = new Slider(0f, 100f);
+        Slider settingSlider = new Slider(minValue, maxValue);
         settingSlider.AddToClassList("pause-slider");
-        settingSlider.SetValueWithoutNotify(value01 * 100f);
+        settingSlider.SetValueWithoutNotify(displayVal);
         setting.Add(settingSlider);
         slider = settingSlider;
 
         settingSlider.RegisterValueChangedCallback(evt =>
         {
-            float v = Mathf.Clamp01(evt.newValue / 100f);
-            valueText.text = Mathf.RoundToInt(v * 100f) + "%";
+            float v = isSensitivity ? Mathf.Clamp(evt.newValue / 100f, 0.1f, 2f) : Mathf.Clamp01(evt.newValue / 100f);
+            valueText.text = Mathf.RoundToInt(evt.newValue) + "%";
             onChanged(v);
         });
 
         return setting;
+    }
+
+    VisualElement BuildGraphicsDropdown()
+    {
+        VisualElement setting = new VisualElement();
+        setting.AddToClassList("pause-setting");
+
+        VisualElement row = new VisualElement();
+        row.AddToClassList("pause-setting-row");
+        setting.Add(row);
+
+        row.Add(MakeLabel("GRAPHICS", "pause-setting-label"));
+
+        string[] names = QualitySettings.names;
+        DropdownField dropdown = new DropdownField();
+        dropdown.AddToClassList("pause-dropdown");
+        if (names != null && names.Length > 0)
+        {
+            dropdown.choices = new System.Collections.Generic.List<string>(names);
+            int current = GameSettings.QualityLevel >= 0
+                ? GameSettings.QualityLevel
+                : QualitySettings.GetQualityLevel();
+            current = Mathf.Clamp(current, 0, names.Length - 1);
+            dropdown.SetValueWithoutNotify(names[current]);
+            dropdown.RegisterValueChangedCallback(evt =>
+            {
+                int index = Array.IndexOf(names, evt.newValue);
+                if (index >= 0) GameSettings.SetQualityLevel(index);
+            });
+        }
+        setting.Add(dropdown);
+        return setting;
+    }
+
+    VisualElement BuildFrameRateDropdown()
+    {
+        VisualElement setting = new VisualElement();
+        setting.AddToClassList("pause-setting");
+
+        VisualElement row = new VisualElement();
+        row.AddToClassList("pause-setting-row");
+        setting.Add(row);
+
+        row.Add(MakeLabel("TARGET FPS", "pause-setting-label"));
+
+        var options = new System.Collections.Generic.List<string> { "30 FPS (Battery Saver)", "60 FPS (Default)", "Max / Uncapped" };
+        int[] fpsValues = new int[] { 30, 60, -1 };
+
+        DropdownField dropdown = new DropdownField();
+        dropdown.AddToClassList("pause-dropdown");
+        dropdown.choices = options;
+
+        int currentFps = GameSettings.TargetFrameRate;
+        int selectedIndex = 1;
+        if (currentFps == 30) selectedIndex = 0;
+        else if (currentFps <= 0 || currentFps > 60) selectedIndex = 2;
+
+        dropdown.SetValueWithoutNotify(options[selectedIndex]);
+        dropdown.RegisterValueChangedCallback(evt =>
+        {
+            int idx = options.IndexOf(evt.newValue);
+            if (idx >= 0 && idx < fpsValues.Length)
+                GameSettings.SetTargetFrameRate(fpsValues[idx]);
+        });
+
+        setting.Add(dropdown);
+        return setting;
+    }
+
+    VisualElement BuildControlsCard(VisualElement mainCard)
+    {
+        VisualElement controlsCard = new VisualElement();
+        controlsCard.AddToClassList("pause-card");
+        controlsCard.AddToClassList("is-hidden");
+
+        controlsCard.Add(MakeLabel("CONTROLS", "pause-heading"));
+        bool isMobile = Application.isMobilePlatform || Input.touchSupported;
+        controlsCard.Add(MakeLabel(isMobile ? "MOBILE TOUCH CONTROLS" : "KEYBOARD & MOUSE", "pause-subheading"));
+        controlsCard.Add(MakeDivider());
+
+        if (isMobile)
+        {
+            controlsCard.Add(MakeControlRow("LEFT JOYSTICK", "MOVE AROUND"));
+            controlsCard.Add(MakeControlRow("RIGHT SCREEN", "SWIPE TO LOOK"));
+            controlsCard.Add(MakeControlRow("FLASHLIGHT ICON", "TOGGLE FLASHLIGHT"));
+            controlsCard.Add(MakeControlRow("SPRINT ICON", "HOLD TO SPRINT"));
+            controlsCard.Add(MakeControlRow("TOP RIGHT GEAR", "PAUSE & SETTINGS"));
+        }
+        else
+        {
+            controlsCard.Add(MakeControlRow("W A S D", "MOVE"));
+            controlsCard.Add(MakeControlRow("MOUSE", "LOOK AROUND"));
+            controlsCard.Add(MakeControlRow("F", "FLASHLIGHT"));
+            controlsCard.Add(MakeControlRow("SHIFT", "SPRINT"));
+            controlsCard.Add(MakeControlRow("SPACE", "JUMP"));
+            controlsCard.Add(MakeControlRow("ESC", "PAUSE / SETTINGS"));
+        }
+
+        controlsCard.Add(MakeDivider());
+        Button backBtn = MakeButton("BACK", () =>
+        {
+            controlsCard.AddToClassList("is-hidden");
+            mainCard.RemoveFromClassList("is-hidden");
+        });
+        controlsCard.Add(backBtn);
+
+        return controlsCard;
+    }
+
+    VisualElement MakeControlRow(string key, string desc)
+    {
+        VisualElement row = new VisualElement();
+        row.AddToClassList("pause-control-row");
+
+        Label keyLabel = MakeLabel(key, "pause-control-key");
+        Label descLabel = MakeLabel(desc, "pause-control-desc");
+
+        row.Add(keyLabel);
+        row.Add(descLabel);
+        return row;
     }
 
     /// Music slider: saves through GameSettings and updates the live ambience.

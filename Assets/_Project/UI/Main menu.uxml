@@ -94,25 +94,62 @@
                 <ui:Label name="controls-heading" class="overlay-heading" text="CONTROLS" />
                 <ui:VisualElement class="divider" picking-mode="Ignore" />
 
-                <ui:VisualElement class="key-row">
-                    <ui:Label class="key" text="W A S D" />
-                    <ui:Label class="key-desc" text="MOVE" />
+                <!-- Tabs: Touch Controls / Keyboard & Mouse -->
+                <ui:VisualElement name="controls-tabs" class="controls-tab-bar">
+                    <ui:Button name="tab-touch" class="controls-tab-btn is-tab-active" text="TOUCH" />
+                    <ui:Button name="tab-keyboard" class="controls-tab-btn" text="KEYBOARD" />
                 </ui:VisualElement>
-                <ui:VisualElement class="key-row">
-                    <ui:Label class="key" text="MOUSE" />
-                    <ui:Label class="key-desc" text="LOOK AROUND" />
+
+                <!-- Touch Controls Container -->
+                <ui:VisualElement name="touch-controls-container" class="controls-container">
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="LEFT JOYSTICK" />
+                        <ui:Label class="key-desc" text="MOVE" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="RIGHT SCREEN" />
+                        <ui:Label class="key-desc" text="DRAG TO LOOK" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="FLASHLIGHT" />
+                        <ui:Label class="key-desc" text="TOGGLE LIGHT" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="SPRINT" />
+                        <ui:Label class="key-desc" text="HOLD TO RUN" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="TOP RIGHT GEAR" />
+                        <ui:Label class="key-desc" text="SETTINGS / PAUSE" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement class="key-row">
-                    <ui:Label class="key" text="F" />
-                    <ui:Label class="key-desc" text="FLASHLIGHT" />
-                </ui:VisualElement>
-                <ui:VisualElement class="key-row">
-                    <ui:Label class="key" text="SHIFT" />
-                    <ui:Label class="key-desc" text="SPRINT" />
-                </ui:VisualElement>
-                <ui:VisualElement class="key-row">
-                    <ui:Label class="key" text="SPACE" />
-                    <ui:Label class="key-desc" text="JUMP" />
+
+                <!-- Keyboard Controls Container -->
+                <ui:VisualElement name="keyboard-controls-container" class="controls-container is-hidden">
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="W A S D" />
+                        <ui:Label class="key-desc" text="MOVE" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="MOUSE" />
+                        <ui:Label class="key-desc" text="LOOK AROUND" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="F" />
+                        <ui:Label class="key-desc" text="FLASHLIGHT" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="SHIFT" />
+                        <ui:Label class="key-desc" text="SPRINT" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="SPACE" />
+                        <ui:Label class="key-desc" text="JUMP" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="ESC" />
+                        <ui:Label class="key-desc" text="SETTINGS / PAUSE" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
 
                 <ui:Button name="controls-close-button" class="overlay-button" text="BACK" />

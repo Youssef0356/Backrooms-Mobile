@@ -256,6 +256,16 @@ public class VillainAI : MonoBehaviour
 
     void Update()
     {
+        if (hasCaught)
+        {
+            if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+            }
+            return;
+        }
+
         if (player == null) return;
         if (agent == null || !agent.isOnNavMesh) return;
 
@@ -291,13 +301,17 @@ public class VillainAI : MonoBehaviour
             return;
         }
 
-        // Reached the wander point? Wait, then pick a new one.
+        // Reached the wander point? Stop, wait, then pick a new one.
         if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.25f)
         {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+
             waitTimer += Time.deltaTime;
             if (waitTimer >= waitAtPoint)
             {
                 waitTimer = 0f;
+                agent.isStopped = false;
                 GoToRandomPoint();
             }
         }
@@ -313,6 +327,9 @@ public class VillainAI : MonoBehaviour
 
         if (isPausedSearching)
         {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+
             searchPauseTimer += Time.deltaTime;
 
             // Intelligent corridor scanning: look left, then right
@@ -339,6 +356,7 @@ public class VillainAI : MonoBehaviour
             {
                 searchPauseTimer = 0f;
                 isPausedSearching = false;
+                agent.isStopped = false;
 
                 if (remainingBranches > 0)
                 {
@@ -364,6 +382,8 @@ public class VillainAI : MonoBehaviour
         {
             // Reached spot: pause and listen
             isPausedSearching = true;
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
             searchPauseTimer = 0f;
             investigateLookForward = transform.forward;
         }
@@ -583,24 +603,34 @@ public class VillainAI : MonoBehaviour
             Vector3 targetDir = moveDir.normalized;
             Quaternion targetRot = Quaternion.LookRotation(targetDir);
 
-            // Dynamic angular ease: snappy start that eases as it locks onto the path
+            // Snappy turn towards target direction
             float angleDelta = Quaternion.Angle(transform.rotation, targetRot);
-            float turnFactor = Mathf.Clamp(angleDelta / 25f, 0.6f, 1.35f);
+            float turnFactor = Mathf.Clamp(angleDelta / 20f, 0.8f, 1.8f);
             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * turnFactor * Time.deltaTime);
 
-            // Alignment: 1.0 when facing target direction, 0 when facing sideways or backward
-            float alignment = Mathf.Clamp01(Vector3.Dot(transform.forward, targetDir));
+            float forwardDot = Vector3.Dot(transform.forward, targetDir);
 
-            // Throttle agent speed: when changing direction, stop/slow down to pivot on the spot
-            // Only advance forward as the body aligns to face the path!
-            agent.speed = baseSpeed * (alignment * alignment);
+            // If the villain is not yet facing forward along the path (angle > 53 degrees),
+            // halt movement so he pivots on the spot and NEVER walks or slides backward!
+            if (forwardDot < 0.6f)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+                agent.speed = 0f;
+            }
+            else
+            {
+                agent.isStopped = false;
+                float alignment = Mathf.Clamp01((forwardDot - 0.6f) / 0.4f);
+                agent.speed = Mathf.Lerp(baseSpeed * 0.4f, baseSpeed, alignment);
+            }
 
-            // Eliminate any backward or sideways slide
+            // Strictly eliminate any reverse velocity component
             Vector3 localVel = transform.InverseTransformDirection(agent.velocity);
             if (localVel.z < 0f)
             {
                 localVel.z = 0f;
-                localVel.x *= 0.2f;
+                localVel.x = 0f;
                 agent.velocity = transform.TransformDirection(localVel);
             }
 
@@ -626,6 +656,7 @@ public class VillainAI : MonoBehaviour
                 modelRoot.localRotation = Quaternion.Euler(0f, 0f, currentBankAngle);
             }
 
+            agent.isStopped = false;
             agent.speed = baseSpeed;
 
             if (currentState == State.Chase && player != null)
@@ -646,28 +677,30 @@ public class VillainAI : MonoBehaviour
     {
         if (anim == null) return;
 
-        float groundSpeed = agent.velocity.magnitude;
+        // Forward ground speed only - never feed backward velocity into forward step animations
+        Vector3 localVel = transform.InverseTransformDirection(agent.velocity);
+        float forwardGroundSpeed = Mathf.Max(0f, localVel.z);
 
         Vector3 moveDir = agent.desiredVelocity;
         moveDir.y = 0f;
-        bool isPivotingOnSpot = moveDir.sqrMagnitude > 0.05f && Vector3.Angle(transform.forward, moveDir) > 35f;
+        bool isPivotingOnSpot = agent.isStopped || (moveDir.sqrMagnitude > 0.05f && Vector3.Dot(transform.forward, moveDir.normalized) < 0.6f);
 
         if (hasSpeed)
         {
-            // Smoothly damp the animator Speed parameter over 0.12s for organic footstep transitions
-            float targetDisplaySpeed = isPivotingOnSpot ? (walkAnimReferenceSpeed * 0.75f) : groundSpeed;
-            anim.SetFloat(speedHash, targetDisplaySpeed, 0.12f, Time.deltaTime);
+            // If pivoting on spot or stopped, display speed is 0 so animator plays Idle, not Walk
+            float targetDisplaySpeed = isPivotingOnSpot ? 0f : forwardGroundSpeed;
+            anim.SetFloat(speedHash, targetDisplaySpeed, 0.10f, Time.deltaTime);
         }
 
-        // When standing still, play at normal rate for idle / attacks
-        if (groundSpeed < 0.08f)
+        // When standing still or pivoting, play at normal rate for idle / attacks
+        if (forwardGroundSpeed < 0.08f || isPivotingOnSpot)
         {
-            anim.speed = isPivotingOnSpot ? 0.9f : 1f;
+            anim.speed = 1f;
             return;
         }
 
         float reference = walkAnimReferenceSpeed;
-        if (currentState == State.Chase || groundSpeed > 2.2f)
+        if (currentState == State.Chase || forwardGroundSpeed > 2.2f)
         {
             reference = runAnimReferenceSpeed;
         }
@@ -675,12 +708,29 @@ public class VillainAI : MonoBehaviour
         if (reference < 0.1f) reference = 0.1f;
 
         // Directly link playback rate to real ground speed so feet never slide
-        anim.speed = Mathf.Clamp(groundSpeed / reference, 0.4f, 3.0f);
+        anim.speed = Mathf.Clamp(forwardGroundSpeed / reference, 0.4f, 3.0f);
     }
 
     void LateUpdate()
     {
         if (headBone == null || player == null) return;
+
+        if (hasCaught)
+        {
+            // Lock eyes straight onto the camera as the monster executes the attack
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                Vector3 toCam = mainCam.transform.position - headBone.position;
+                if (toCam.sqrMagnitude > 0.01f)
+                {
+                    Quaternion lookRot = Quaternion.LookRotation(toCam, Vector3.up);
+                    headBone.rotation = Quaternion.Slerp(headBone.rotation, lookRot, Time.deltaTime * 12f);
+                }
+            }
+            return;
+        }
+
         if (currentState == State.Wander && !CanSeePlayer()) return;
 
         // When hunting, investigating, or chasing, head tracks the player
@@ -754,10 +804,12 @@ public class VillainAI : MonoBehaviour
             }
         }
 
-        if (anim != null && hasAttack1)
+        if (anim != null)
         {
             anim.speed = 1f;
-            anim.SetTrigger(attack1Hash);
+            if (hasAttack1) anim.ResetTrigger(attack1Hash);
+            if (hasAttack2) anim.ResetTrigger(attack2Hash);
+            anim.Play("Attack 1", 0, 0f);
         }
 
         GameOverController.TriggerDefeat(transform);
