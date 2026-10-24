@@ -71,13 +71,7 @@ public class AlmondWaterPickup : MonoBehaviour
 
     private void Update()
     {
-        if (_isCollected) return;
-
-        // Visual hover / float animation
-        _bobTimer += Time.deltaTime * bobSpeed;
-        float yOffset = Mathf.Sin(_bobTimer) * bobHeight;
-        transform.position = _basePosition + Vector3.up * yOffset;
-        transform.Rotate(Vector3.up, spinSpeed * Time.deltaTime, Space.World);
+        // Grounded physical presence: sits naturally on table or floor
     }
 
     private void SetupVisuals()
@@ -93,17 +87,6 @@ public class AlmondWaterPickup : MonoBehaviour
             AlmondWaterMeshBuilder.GetOrCreateBottleMaterial(),
             AlmondWaterMeshBuilder.GetOrCreateLabelMaterial()
         };
-
-        // Add soft warm phosphor glint light so it stands out in dim backrooms
-        GameObject glintObj = new GameObject("GlintLight");
-        glintObj.transform.SetParent(transform, false);
-        glintObj.transform.localPosition = new Vector3(0f, 0.12f, 0f);
-
-        Light glint = glintObj.AddComponent<Light>();
-        glint.type = LightType.Point;
-        glint.color = new Color(1.0f, 0.88f, 0.60f); // warm almond amber
-        glint.range = 2.0f;
-        glint.intensity = 0.85f;
 
         // Ensure collider for interaction raycasting
         Collider col = GetComponent<Collider>();

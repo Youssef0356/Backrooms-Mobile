@@ -1895,19 +1895,19 @@ public class BackroomsRoomGenerator : MonoBehaviour
         pickupRoot.SetParent(root, false);
 
         int spawnedCount = 0;
-        int maxBottles = 10;
+        int maxBottles = 3; // Rare survival commodity across the entire complex
 
-        // 1. Spawn on valid table / desk surfaces
-        for (int i = 0; i < tableTopSpots.Count && spawnedCount < 5; i++)
+        // 1. Rarely spawn on a table / desk surface (max 2)
+        for (int i = 0; i < tableTopSpots.Count && spawnedCount < 2; i++)
         {
-            if (Random.value < 0.85f)
+            if (Random.value < 0.25f)
             {
                 SpawnAlmondWaterBottle(pickupRoot, tableTopSpots[i]);
                 spawnedCount++;
             }
         }
 
-        // 2. Spawn in room corners or alcoves across the map
+        // 2. Spawn remaining in a secluded room corner or alcove
         Vector2Int spawnCell = rooms.Count > 0 ? RoomCenter(rooms[0]) : new Vector2Int(-99, -99);
         List<Vector2Int> validCells = new List<Vector2Int>();
 
@@ -1916,8 +1916,8 @@ public class BackroomsRoomGenerator : MonoBehaviour
             for (int z = 2; z < gridHeight - 2; z++)
             {
                 if (!floor[x, z]) continue;
-                if (Mathf.Abs(spawnCell.x - x) <= 2 && Mathf.Abs(spawnCell.y - z) <= 2) continue;
-                if (reservedExitCell.x >= 0 && Mathf.Abs(reservedExitCell.x - x) <= 2 && Mathf.Abs(reservedExitCell.y - z) <= 2) continue;
+                if (Mathf.Abs(spawnCell.x - x) <= 3 && Mathf.Abs(spawnCell.y - z) <= 3) continue;
+                if (reservedExitCell.x >= 0 && Mathf.Abs(reservedExitCell.x - x) <= 3 && Mathf.Abs(reservedExitCell.y - z) <= 3) continue;
                 validCells.Add(new Vector2Int(x, z));
             }
         }
@@ -1934,7 +1934,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         {
             Vector2Int c = validCells[i];
             Vector3 center = CellCenter(c.x, c.y);
-            Vector3 bottlePos = center + new Vector3(Random.Range(-0.85f, 0.85f), 0.05f, Random.Range(-0.85f, 0.85f));
+            Vector3 bottlePos = center + new Vector3(Random.Range(-0.85f, 0.85f), 0.0f, Random.Range(-0.85f, 0.85f));
             SpawnAlmondWaterBottle(pickupRoot, bottlePos);
             spawnedCount++;
         }

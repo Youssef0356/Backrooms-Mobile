@@ -246,14 +246,14 @@ public class VentHideSpot : MonoBehaviour
         if (flapCollider != null) flapCollider.enabled = degrees < 8f;
     }
 
-    public void PlayCreak(float volume = 0.9f)
+    public void PlayCreak(float volume = 0.28f)
     {
-        Play(VentAudio.Creak, volume, Random.Range(0.92f, 1.08f));
+        Play(VentAudio.Creak, volume, Random.Range(0.95f, 1.05f));
     }
 
-    public void PlayThunk(float volume = 1f)
+    public void PlayThunk(float volume = 0.32f)
     {
-        Play(VentAudio.Thunk, volume, Random.Range(0.94f, 1.05f));
+        Play(VentAudio.Thunk, volume, Random.Range(0.96f, 1.04f));
     }
 
     void Play(AudioClip clip, float volume, float pitch)
@@ -438,33 +438,28 @@ public static class VentAudio
 
     static AudioClip MakeCreak()
     {
-        float len = 0.75f;
+        // Gentle, soft brushed metal sliding friction: zero harsh synthesizer waves
+        float len = 0.55f;
         int n = (int)(Rate * len);
         float[] d = new float[n];
-        System.Random rng = new System.Random(7);
-        float phase = 0f;
+        System.Random rng = new System.Random(42);
         float lp = 0f;
 
         for (int i = 0; i < n; i++)
         {
             float t = i / (float)Rate;
-            float p = t / len;
+            float progress = t / len;
 
-            // pitch wobbles downward as the hinge turns
-            float freq = Mathf.Lerp(310f, 120f, p) + Mathf.Sin(t * 31f) * 25f;
-            phase += freq / Rate;
-            float saw = (phase % 1f) * 2f - 1f;
-
-            // stick-slip: amplitude chatters in and out
-            float chatter = 0.55f + 0.45f * Mathf.Sin(t * 2f * Mathf.PI * 41f + Mathf.Sin(t * 9f) * 2f);
-            float env = Mathf.Sin(Mathf.PI * p);
-            env = Mathf.Sqrt(Mathf.Max(0f, env));
-
+            // Soft low-pass filtered metal brush
             float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-            lp += (noise - lp) * 0.25f;
+            lp += (noise - lp) * 0.12f;
 
-            float s = (saw * 0.6f + lp * 0.5f) * chatter * env;
-            d[i] = (float)System.Math.Tanh(s * 1.6f) * 0.5f;
+            // Subtle warm metallic body resonance
+            float resonance = Mathf.Sin(2f * Mathf.PI * 340f * t) * 0.15f +
+                              Mathf.Sin(2f * Mathf.PI * 520f * t) * 0.08f;
+
+            float env = Mathf.Sin(Mathf.PI * progress);
+            d[i] = (lp * 0.7f + resonance) * env * 0.45f;
         }
 
         AudioClip c = AudioClip.Create("VentCreak", n, 1, Rate, false);
@@ -474,29 +469,26 @@ public static class VentAudio
 
     static AudioClip MakeThunk()
     {
-        float len = 0.55f;
+        // Quiet, muted hollow tin latch click: soft damped tap
+        float len = 0.28f;
         int n = (int)(Rate * len);
         float[] d = new float[n];
-        System.Random rng = new System.Random(11);
-        float phase = 0f;
-        float phase2 = 0f;
+        System.Random rng = new System.Random(88);
 
         for (int i = 0; i < n; i++)
         {
             float t = i / (float)Rate;
 
-            float freq = Mathf.Lerp(95f, 42f, Mathf.Clamp01(t * 6f));
-            phase += freq / Rate;
-            float body = Mathf.Sin(phase * 2f * Mathf.PI) * Mathf.Exp(-t * 11f);
+            // Damped hollow duct body thump
+            float thump = Mathf.Sin(2f * Mathf.PI * 85f * t) * Mathf.Exp(-t * 24f) * 0.5f;
 
-            // metallic clank on top
-            phase2 += 780f / Rate;
-            float clank = Mathf.Sin(phase2 * 2f * Mathf.PI) * Mathf.Exp(-t * 30f) * 0.35f;
-            clank += Mathf.Sin(phase2 * 2f * Mathf.PI * 1.51f) * Mathf.Exp(-t * 38f) * 0.2f;
+            // Soft metallic latch contact
+            float latch = Mathf.Sin(2f * Mathf.PI * 460f * t) * Mathf.Exp(-t * 40f) * 0.25f;
 
-            float click = t < 0.02f ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.02f) * 0.6f : 0f;
+            // Quick initial tactile click
+            float click = (t < 0.015f) ? (float)(rng.NextDouble() * 2.0 - 1.0) * (1f - t / 0.015f) * 0.2f : 0f;
 
-            d[i] = Mathf.Clamp((body * 0.9f + clank + click), -1f, 1f) * 0.8f;
+            d[i] = Mathf.Clamp(thump + latch + click, -1f, 1f) * 0.45f;
         }
 
         AudioClip c = AudioClip.Create("VentThunk", n, 1, Rate, false);

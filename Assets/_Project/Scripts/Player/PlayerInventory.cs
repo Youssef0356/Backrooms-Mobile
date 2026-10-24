@@ -21,7 +21,7 @@ public class PlayerInventory : MonoBehaviour
 
     [Header("Inventory Capacity")]
     [SerializeField] private int maxCapacity = 4;
-    [SerializeField] private int startingBottles = 1;
+    [SerializeField] private int startingBottles = 0;
 
     [Header("Interaction Raycasting")]
     [Tooltip("Maximum distance to detect pickups.")]

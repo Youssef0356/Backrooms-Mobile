@@ -99,7 +99,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 377147744992256040}
-  - component: {fileID: 119635129503025368}
+  - component: {fileID: 8082843610351091349}
   m_Layer: 0
   m_Name: "Canap\xE9"
   m_TagString: Untagged
@@ -123,7 +123,7 @@ Transform:
   - {fileID: 9085558088008095291}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &119635129503025368
+--- !u!65 &8082843610351091349
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
