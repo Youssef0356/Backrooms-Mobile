@@ -91,6 +91,7 @@ public class VictoryController : MonoBehaviour
             IsGameWon = false;
         }
 
+        Time.timeScale = 1f;
         RestoreCursor();
     }
 
@@ -134,14 +135,49 @@ public class VictoryController : MonoBehaviour
         DisablePlayerInput();
         HideMobileControls();
         PlayVictoryAudio();
+        FreezeAllEntities();
 
         yield return new WaitForSecondsRealtime(showDelay);
 
         ShowVictoryUI();
     }
 
+    void FreezeAllEntities()
+    {
+        VillainAI[] villains = Object.FindObjectsByType<VillainAI>(FindObjectsSortMode.None);
+        foreach (var v in villains)
+        {
+            if (v == null) continue;
+
+            var agent = v.GetComponent<UnityEngine.AI.NavMeshAgent>();
+            if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+                agent.ResetPath();
+            }
+
+            var anim = v.GetComponentInChildren<Animator>();
+            if (anim != null)
+            {
+                anim.speed = 0f;
+            }
+        }
+
+        Animator[] animators = Object.FindObjectsByType<Animator>(FindObjectsSortMode.None);
+        foreach (var a in animators)
+        {
+            if (a != null && !a.CompareTag("Player"))
+            {
+                a.speed = 0f;
+            }
+        }
+    }
+
     void ShowVictoryUI()
     {
+        Time.timeScale = 0f;
+
         if (timeStatLabel != null)
         {
             TimeSpan span = TimeSpan.FromSeconds(timeElapsed);

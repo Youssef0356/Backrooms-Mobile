@@ -58,8 +58,19 @@ namespace StarterAssets
         private Vector2 m_AccumulatedLookDelta;
         private bool m_HasLookDelta;
 
+        public static TouchscreenInput Instance { get; private set; }
+
+        public void SetVisible(bool visible)
+        {
+            if (m_Document != null && m_Document.rootVisualElement != null)
+            {
+                m_Document.rootVisualElement.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+        }
+
         private void Awake()
         {
+            Instance = this;
             m_Document = GetComponent<UIDocument>();
 
             // Determine if touch controls should be active based on platform or manual test override

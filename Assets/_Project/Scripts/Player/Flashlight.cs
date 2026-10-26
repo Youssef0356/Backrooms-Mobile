@@ -176,11 +176,16 @@ public class Flashlight : MonoBehaviour
 
     public void Toggle()
     {
-        isOn = !isOn;
+        SetState(!isOn);
+    }
+
+    public void SetState(bool state, bool playAudio = true)
+    {
+        isOn = state;
         Apply(intensity);
         StarterAssets.TouchscreenInput.SetFlashlightState(isOn);
 
-        if (audioSource != null)
+        if (playAudio && audioSource != null)
         {
             AudioClip clip = isOn ? clickOnClip : clickOffClip;
             if (clip != null)

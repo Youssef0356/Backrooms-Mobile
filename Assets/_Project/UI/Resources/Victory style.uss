@@ -83,7 +83,7 @@
     position: absolute;
     top: 24px;
     left: 32px;
-    font-size: 14px;
+    font-size: 16px;
     letter-spacing: 4px;
     -unity-font-style: bold;
     color: var(--success-bright);
@@ -93,7 +93,7 @@
     position: absolute;
     top: 24px;
     right: 32px;
-    font-size: 14px;
+    font-size: 16px;
     letter-spacing: 4px;
     color: var(--success-dim);
 }
@@ -121,7 +121,7 @@
 .victory-subheading {
     margin-top: 6px;
     margin-bottom: 12px;
-    font-size: 12px;
+    font-size: 16px;
     letter-spacing: 4px;
     color: var(--text-dim);
     -unity-text-align: middle-center;
@@ -153,13 +153,13 @@
 }
 
 .victory-stat-label {
-    font-size: 14px;
+    font-size: 17px;
     letter-spacing: 3px;
     color: var(--text-dim);
 }
 
 .victory-stat-value {
-    font-size: 14px;
+    font-size: 17px;
     letter-spacing: 3px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -174,7 +174,7 @@
 .victory-button {
     margin-top: 12px;
     height: 52px;
-    font-size: 19px;
+    font-size: 21px;
     letter-spacing: 6px;
     -unity-font-style: bold;
     color: var(--text);

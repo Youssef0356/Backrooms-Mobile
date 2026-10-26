@@ -9,15 +9,15 @@ public static class PlatformUtils
 {
     /// <summary>
     /// Returns true only when running on a genuine mobile device (Android/iOS),
-    /// or when running under a mobile runtime. Standalone desktop builds always return false.
+    /// or when running under a mobile runtime. Standalone desktop builds and PC editor always return false.
     /// </summary>
     public static bool IsMobile
     {
         get
         {
 #if UNITY_ANDROID || UNITY_IOS
-            return true;
-#elif UNITY_STANDALONE
+            return !Application.isEditor;
+#elif UNITY_STANDALONE || UNITY_EDITOR
             return false;
 #else
             return Application.isMobilePlatform;

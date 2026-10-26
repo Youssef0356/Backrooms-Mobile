@@ -102,7 +102,7 @@
 }
 
 .pause-heading {
-    font-size: 30px;
+    font-size: 34px;
     letter-spacing: 10px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -112,7 +112,7 @@
 .pause-subheading {
     margin-top: 4px;
     margin-bottom: 8px;
-    font-size: 12px;
+    font-size: 16px;
     letter-spacing: 5px;
     color: var(--muted);
     -unity-text-align: middle-center;
@@ -129,8 +129,8 @@
 
 .pause-button {
     margin-top: 16px;
-    height: 50px;
-    font-size: 20px;
+    height: 54px;
+    font-size: 22px;
     letter-spacing: 6px;
     -unity-font-style: bold;
     color: var(--text);
@@ -177,13 +177,13 @@
 
 .pause-setting-label {
     flex-grow: 1;
-    font-size: 16px;
+    font-size: 19px;
     letter-spacing: 4px;
     color: var(--text);
 }
 
 .pause-setting-value {
-    font-size: 15px;
+    font-size: 18px;
     letter-spacing: 3px;
     color: var(--accent);
     -unity-text-align: upper-right;
@@ -227,14 +227,14 @@
 .pause-segmented-pill {
     flex-grow: 1;
     flex-basis: 0;
-    height: 44px;
+    height: 48px;
     background-color: rgba(223, 216, 118, 0.06);
     background-image: none;
     border-width: 1px;
     border-color: rgba(223, 216, 118, 0.22);
     border-radius: 4px;
     color: var(--muted);
-    font-size: 14px;
+    font-size: 17px;
     letter-spacing: 2px;
     -unity-text-align: middle-center;
     padding-left: 2px;
@@ -281,7 +281,7 @@
 
 .pause-dropdown .unity-base-popup-field__text {
     color: var(--accent);
-    font-size: 15px;
+    font-size: 18px;
     letter-spacing: 2px;
 }
 
@@ -291,19 +291,19 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    height: 32px;
-    margin-bottom: 4px;
+    height: 38px;
+    margin-bottom: 6px;
 }
 
 .pause-control-key {
-    font-size: 14px;
+    font-size: 18px;
     letter-spacing: 2px;
     -unity-font-style: bold;
     color: var(--accent);
 }
 
 .pause-control-desc {
-    font-size: 13px;
+    font-size: 17px;
     letter-spacing: 2px;
     color: var(--muted);
 }
@@ -364,8 +364,8 @@
 
 .guide-tab-btn {
     flex-grow: 1;
-    height: 42px;
-    font-size: 13px;
+    height: 46px;
+    font-size: 16px;
     letter-spacing: 2px;
     -unity-font-style: bold;
     color: var(--muted);
@@ -411,7 +411,7 @@
 }
 
 .guide-box-title {
-    font-size: 15px;
+    font-size: 18px;
     letter-spacing: 2px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -423,7 +423,7 @@
 }
 
 .guide-box-desc {
-    font-size: 13px;
+    font-size: 16px;
     letter-spacing: 1px;
     color: var(--text);
     white-space: normal;
@@ -441,7 +441,7 @@
 }
 
 .guide-toggle {
-    font-size: 12px;
+    font-size: 15px;
     letter-spacing: 2px;
     color: var(--muted);
 }

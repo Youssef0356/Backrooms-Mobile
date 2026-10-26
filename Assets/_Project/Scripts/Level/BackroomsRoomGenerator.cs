@@ -92,6 +92,32 @@ public class BackroomsRoomGenerator : MonoBehaviour
     public Material ventMetalMaterial;
     public Material ventDuctMaterial;
 
+    [Header("Enclosed Rooms & Doors")]
+    [Tooltip("Generate enclosed rooms with perimeter partition walls and interactive swinging doors.")]
+    public bool enableEnclosedRooms = true;
+    [Tooltip("Maximum number of rooms on the entire map that will have doors.")]
+    [Range(1, 10)] public int maxEnclosedRooms = 3;
+    [Range(0f, 1f)] public float roomDoorChance = 0.28f;
+    [Tooltip("Opening width of the doorway in meters. Must be >= 1.85m so monster NavMesh agent can freely pass.")]
+    public float doorwayWidth = 1.95f;
+    [Tooltip("Opening height of the doorway in meters. Tall enough so tall monster models easily fit.")]
+    public float doorwayHeight = 2.85f;
+    [Tooltip("Seconds an opened door stays open before closing automatically.")]
+    public float doorStayOpenSeconds = 4.5f;
+    public Material doorWoodMaterial;
+    public Material doorFrameMaterial;
+
+    [Header("Room Lockers")]
+    [Tooltip("Scatter hideable lockers inside rooms for evading the entity.")]
+    public bool enableRoomLockers = true;
+    [Range(0f, 1f)] public float lockerChancePerRoom = 0.80f;
+    public Material lockerExteriorMaterial;
+    public Material lockerInteriorMaterial;
+
+    [Header("Door Events")]
+    [Tooltip("Periodically trigger paranormal events where all doors open and slam shut.")]
+    public bool enableDoorEvents = true;
+
     [Header("Optional prefabs (override the boxes)")]
     public GameObject floorPrefab;
     public GameObject ceilingPrefab;
@@ -103,6 +129,15 @@ public class BackroomsRoomGenerator : MonoBehaviour
     public NavMeshSurface surface;          // your NavMeshBuilder object
     public Transform player;                // PlayerCapsule
     public GameObject villain;              // keep INACTIVE in the scene; the generator enables it
+
+    [Header("Smily Hound (Exit Portal Guardian)")]
+    [Tooltip("Spawn the smart 4-legged Smily Hound guarding the exit portal area.")]
+    public bool enableSmilyHound = true;
+    public GameObject smilyHoundPrefab;
+
+    [Header("Prologue Intro")]
+    [Tooltip("Start Level 0 in the player's dark house at night before noclip transition to Backrooms.")]
+    public bool enableHousePrologue = true;
 
     [Header("Audio")]
     public bool autoAmbience = true;        // create a BackroomsAmbience object at level start
@@ -117,7 +152,26 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
     void Start()
     {
-        Generate();
+        if (enableHousePrologue && Application.isPlaying)
+        {
+            HousePrologueDirector prologue = gameObject.AddComponent<HousePrologueDirector>();
+            Transform targetPlayer = player;
+            if (targetPlayer == null)
+            {
+                GameObject p = GameObject.FindGameObjectWithTag("Player");
+                if (p != null) targetPlayer = p.transform;
+            }
+
+            prologue.BeginPrologue(targetPlayer, () =>
+            {
+                // Called when player falls asleep and nocslips: generate Backrooms and wake up!
+                Generate();
+            });
+        }
+        else
+        {
+            Generate();
+        }
     }
 
     [ContextMenu("Regenerate")]
@@ -149,6 +203,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         SelectVentSlots();
         BuildFloorsAndCeilings();
         BuildWalls();
+        BuildEnclosedRoomsAndDoors();
         BuildPillars();
         BuildLights();
 
@@ -169,6 +224,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         EnsureAmbience();
         EnsureAtmosphere();
         EnsureBlackoutEvents();
+        EnsureDoorEventManager();
         EnsureParticles();
         EnsureVHSGlitch();
         EnsureGameOverSystem();
@@ -177,6 +233,7 @@ public class BackroomsRoomGenerator : MonoBehaviour
         EnsurePlayerMotion();
         EnsurePlayerStaminaHUD();
         EnsurePlayerVentController();
+        EnsurePlayerLockerController();
         EnsureVentHUD();
         EnsureMonsterCompositionAudio();
         EnsurePlayerSanity();
@@ -1590,11 +1647,13 @@ public class BackroomsRoomGenerator : MonoBehaviour
         if (rooms.Count == 0) return;
 
         Vector2Int startCell = RoomCenter(rooms[0]);
-        RectInt bestRoom = rooms[0];
+        RectInt bestRoom = rooms.Count > 1 ? rooms[1] : rooms[0];
         float bestScore = -1f;
 
-        foreach (RectInt r in rooms)
+        // Strictly exclude rooms[0] (player spawn) so the exit is NEVER reserved in the player's room
+        for (int i = 1; i < rooms.Count; i++)
         {
+            RectInt r = rooms[i];
             Vector2Int c = RoomCenter(r);
             float dist = Vector2Int.Distance(startCell, c);
             if (dist > bestScore)
@@ -1668,14 +1727,35 @@ public class BackroomsRoomGenerator : MonoBehaviour
     {
         Vector3 startPos = CellCenter(startCell.x, startCell.y);
 
-        // Sort candidate rooms descending by combined distance from player spawn and villain
-        List<RectInt> candidateRooms = new List<RectInt>(rooms);
+        // Filter candidate rooms to strictly guarantee the portal NEVER spawns near player spawn!
+        // Minimum 14 tiles separation (35 meters away)
+        List<RectInt> candidateRooms = new List<RectInt>();
+        float minSeparationTiles = 14f;
+
+        foreach (RectInt r in rooms)
+        {
+            if (r.Equals(rooms[0])) continue; // Never in player spawn room!
+            float dist = Vector2Int.Distance(startCell, RoomCenter(r));
+            if (dist >= minSeparationTiles)
+            {
+                candidateRooms.Add(r);
+            }
+        }
+
+        if (candidateRooms.Count == 0)
+        {
+            // Fallback for smaller layouts: pick rooms furthest from player, excluding rooms[0]
+            foreach (RectInt r in rooms)
+            {
+                if (!r.Equals(rooms[0])) candidateRooms.Add(r);
+            }
+        }
+
+        // Sort candidate rooms descending by distance from player spawn
         candidateRooms.Sort((a, b) =>
         {
-            float distA = Vector2Int.Distance(startCell, RoomCenter(a)) * 1.5f +
-                          Vector2Int.Distance(RoomCenter(villainRoom), RoomCenter(a)) * 0.5f;
-            float distB = Vector2Int.Distance(startCell, RoomCenter(b)) * 1.5f +
-                          Vector2Int.Distance(RoomCenter(villainRoom), RoomCenter(b)) * 0.5f;
+            float distA = Vector2Int.Distance(startCell, RoomCenter(a));
+            float distB = Vector2Int.Distance(startCell, RoomCenter(b));
             return distB.CompareTo(distA);
         });
 
@@ -1737,6 +1817,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
         GameObject exitGo = BackroomsExitZone.BuildExitPortal(finalPos, finalRot, wallMaterial, lightPanelMaterial);
         if (root != null) exitGo.transform.SetParent(root, true);
 
+        // Spawn smart 4-legged Smily Hound guarding the exit portal area
+        if (enableSmilyHound)
+        {
+            SpawnSmilyHoundAtExit(finalPos, finalRot);
+        }
+
         // Safety clear: remove any stray colliders in front of the doorway threshold
         Vector3 doorClearArea = finalPos + finalRot * new Vector3(0f, 0f, -0.8f);
         Collider[] overlaps = Physics.OverlapSphere(doorClearArea, 1.4f);
@@ -1753,6 +1839,93 @@ public class BackroomsRoomGenerator : MonoBehaviour
                 Destroy(t.gameObject);
             }
         }
+    }
+
+    void SpawnSmilyHoundAtExit(Vector3 portalPos, Quaternion portalRot)
+    {
+        // Position 5.5m in front of exit portal on NavMesh
+        Vector3 spawnTarget = portalPos + portalRot * new Vector3(0f, 0f, -5.5f);
+        if (NavMesh.SamplePosition(spawnTarget, out NavMeshHit hit, 8f, NavMesh.AllAreas))
+        {
+            spawnTarget = hit.position;
+        }
+
+        // Face outward into the room/corridor towards incoming players
+        Quaternion facing = Quaternion.LookRotation(portalRot * Vector3.back, Vector3.up);
+
+        GameObject houndGo = null;
+
+        if (smilyHoundPrefab != null)
+        {
+            houndGo = Instantiate(smilyHoundPrefab, spawnTarget, facing);
+        }
+        else
+        {
+            // Build normalized Hound with visual child
+            houndGo = new GameObject("SmilyHorrorHound");
+            houndGo.transform.position = spawnTarget;
+            houndGo.transform.rotation = facing;
+            GameObject modelAsset = null;
+#if UNITY_EDITOR
+            modelAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Art/Characters/smily dog/smily_horror_monster.glb");
+#endif
+            if (modelAsset != null)
+            {
+                GameObject visual = Instantiate(modelAsset, houndGo.transform, false);
+                visual.name = "VisualModel";
+                const float s = 0.013f;
+                visual.transform.localPosition = new Vector3(75.089f * s, -10f * s, -10f * s);
+                visual.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                visual.transform.localScale = new Vector3(s, s, s);
+
+#if UNITY_EDITOR
+                RuntimeAnimatorController ctrl = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/_Project/Art/Characters/smily dog/SmilyMonster.controller");
+                Animator anim = visual.GetComponent<Animator>();
+                if (anim == null) anim = visual.AddComponent<Animator>();
+                if (ctrl != null) anim.runtimeAnimatorController = ctrl;
+#endif
+            }
+        }
+
+        if (houndGo == null) return;
+
+        // Ensure any raw sketchfab child inside houndGo is normalized (in case prefab or asset was passed directly)
+        Transform sketchfabChild = houndGo.transform.Find("Sketchfab_model");
+        if (sketchfabChild != null)
+        {
+            const float s = 0.013f;
+            sketchfabChild.localPosition = new Vector3(75.089f * s, -10f * s, -10f * s);
+            sketchfabChild.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            sketchfabChild.localScale = new Vector3(s, s, s);
+        }
+
+        NavMeshAgent agent = houndGo.GetComponent<NavMeshAgent>();
+        if (agent == null) agent = houndGo.AddComponent<NavMeshAgent>();
+        agent.enabled = false;
+
+        houndGo.transform.position = spawnTarget;
+        houndGo.transform.rotation = facing;
+
+        // NavMeshAgent configuration calibrated for 4-legged beast
+        agent.radius = 0.45f;
+        agent.height = 0.90f;
+        agent.speed = 4.4f;
+        agent.acceleration = 14f;
+        agent.angularSpeed = 500f;
+        agent.stoppingDistance = 1.2f;
+
+        // Ensure 4-legged procedural gallop runner
+        SmilyMonsterGait gait = houndGo.GetComponent<SmilyMonsterGait>();
+        if (gait == null) gait = houndGo.AddComponent<SmilyMonsterGait>();
+
+        // Ensure smart territorial AI guarding the portal
+        SmilyHoundAI ai = houndGo.GetComponent<SmilyHoundAI>();
+        if (ai == null) ai = houndGo.AddComponent<SmilyHoundAI>();
+        ai.SetPortalAnchor(portalPos);
+
+        houndGo.SetActive(true);
+        agent.enabled = true;
+        agent.Warp(spawnTarget);
     }
 
     void EnsureGameOverSystem()
@@ -1856,6 +2029,12 @@ public class BackroomsRoomGenerator : MonoBehaviour
 
     void EnsureMonsterCompositionAudio()
     {
+        // Ensure Outlast 2 style chase soundtrack director
+        if (FindAnyObjectByType<ChaseSoundtrackDirector>() == null)
+        {
+            new GameObject("Chase Soundtrack Director").AddComponent<ChaseSoundtrackDirector>();
+        }
+
         MonsterCompositionAudio compAudio = FindAnyObjectByType<MonsterCompositionAudio>();
         if (compAudio == null)
         {
@@ -2002,5 +2181,278 @@ public class BackroomsRoomGenerator : MonoBehaviour
     {
         if (FindAnyObjectByType<HallucinationManager>() != null) return;
         new GameObject("Hallucination Manager").AddComponent<HallucinationManager>();
+    }
+
+    void EnsureDoorEventManager()
+    {
+        if (!enableDoorEvents) return;
+        if (FindAnyObjectByType<BackroomsDoorEventManager>() != null) return;
+        new GameObject("Backrooms Door Event Manager").AddComponent<BackroomsDoorEventManager>();
+    }
+
+    void EnsurePlayerLockerController()
+    {
+        Transform targetPlayer = player;
+        if (targetPlayer == null)
+        {
+            var fpc = FindAnyObjectByType<StarterAssets.FirstPersonController>();
+            if (fpc != null) targetPlayer = fpc.transform;
+        }
+
+        if (targetPlayer != null)
+        {
+            if (targetPlayer.GetComponent<PlayerLockerController>() == null)
+                targetPlayer.gameObject.AddComponent<PlayerLockerController>();
+
+            if (targetPlayer.GetComponent<PlayerDoorInteraction>() == null)
+                targetPlayer.gameObject.AddComponent<PlayerDoorInteraction>();
+        }
+    }
+
+    struct RoomBoundaryEdge
+    {
+        public int roomIndex;
+        public int rx, rz;
+        public int cx, cz;
+        public int d;
+        public Vector3 edgePos;
+        public Vector3 outwardDir;
+        public bool alongX;
+    }
+
+    void BuildEnclosedRoomsAndDoors()
+    {
+        if (!enableEnclosedRooms) return;
+
+        int[] dx = { 0, 0, 1, -1 };
+        int[] dz = { 1, -1, 0, 0 };
+
+        int maxRoomsToEnclose = Mathf.Clamp(maxEnclosedRooms, 1, 6);
+        float doorChance = Mathf.Min(roomDoorChance, 0.40f);
+
+        // Collect valid rooms eligible for enclosure
+        List<int> candidateRoomIndices = new List<int>();
+        // Start from rIdx = 1: rooms[0] is player spawn and MUST ALWAYS remain open!
+        for (int rIdx = 1; rIdx < rooms.Count; rIdx++)
+        {
+            RectInt r = rooms[rIdx];
+
+            // Never enclose the room containing the exit portal
+            if (reservedExitCell.x >= r.x && reservedExitCell.x < r.x + r.width &&
+                reservedExitCell.y >= r.y && reservedExitCell.y < r.y + r.height)
+            {
+                continue;
+            }
+
+            candidateRoomIndices.Add(rIdx);
+        }
+
+        // Shuffle candidate rooms
+        for (int i = 0; i < candidateRoomIndices.Count; i++)
+        {
+            int rnd = Random.Range(i, candidateRoomIndices.Count);
+            int tmp = candidateRoomIndices[i];
+            candidateRoomIndices[i] = candidateRoomIndices[rnd];
+            candidateRoomIndices[rnd] = tmp;
+        }
+
+        int enclosedCount = 0;
+
+        foreach (int rIdx in candidateRoomIndices)
+        {
+            if (enclosedCount >= maxRoomsToEnclose) break;
+
+            RectInt r = rooms[rIdx];
+
+            // Roll door spawn chance
+            if (Random.value > doorChance) continue;
+
+            // Collect all boundary edges that connect this room to outside corridors
+            List<RoomBoundaryEdge> edges = new List<RoomBoundaryEdge>();
+
+            for (int x = r.x; x < r.x + r.width; x++)
+            {
+                for (int z = r.y; z < r.y + r.height; z++)
+                {
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = x + dx[d];
+                        int nz = z + dz[d];
+                        if (nx < 0 || nz < 0 || nx >= gridWidth || nz >= gridHeight) continue;
+
+                        if (floor[nx, nz] && !roomCell[nx, nz])
+                        {
+                            Vector3 dir = new Vector3(dx[d], 0, dz[d]);
+                            Vector3 edgePos = CellCenter(x, z) + dir * (tileSize * 0.5f);
+                            bool alongX = (dx[d] == 0);
+
+                            edges.Add(new RoomBoundaryEdge
+                            {
+                                roomIndex = rIdx,
+                                rx = x, rz = z,
+                                cx = nx, cz = nz,
+                                d = d,
+                                edgePos = edgePos,
+                                outwardDir = dir,
+                                alongX = alongX
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (edges.Count == 0) continue;
+
+            // Prefer rooms that act as actual rooms (1 to 3 connections), avoid central multi-way crossroads
+            if (edges.Count > 3) continue;
+
+            // Every corridor connection to this room gets a wide doorway with an interactive door.
+            List<Vector3> placedDoorPositions = new List<Vector3>();
+
+            for (int i = 0; i < edges.Count; i++)
+            {
+                RoomBoundaryEdge edge = edges[i];
+
+                BuildDoorwayWall(edge.edgePos, edge.outwardDir, edge.alongX, doorwayWidth, doorwayHeight);
+
+                BackroomsDoor door = BackroomsDoor.Create(root, edge.edgePos, edge.outwardDir,
+                                                         doorwayWidth, doorwayHeight, doorWoodMaterial, doorFrameMaterial);
+                door.autoCloseDelay = doorStayOpenSeconds;
+                placedDoorPositions.Add(edge.edgePos);
+            }
+
+            // Scatter hideable Locker inside this enclosed room
+            if (enableRoomLockers && Random.value <= lockerChancePerRoom)
+            {
+                PlaceLockerInRoom(r, placedDoorPositions, dx, dz);
+            }
+
+            enclosedCount++;
+        }
+    }
+
+    void BuildDoorwayWall(Vector3 edge, Vector3 dir, bool alongX, float doorwayW = 1.95f, float doorwayH = 2.85f)
+    {
+        float L = tileSize + wallThickness;
+        float H = wallHeight;
+        float T = wallThickness;
+        float sideW = (L - doorwayW) * 0.5f;
+
+        if (alongX)
+        {
+            // 1. Top lintel wall above door opening (ignored by NavMesh bake so monster can never get obstructed)
+            float topH = H - doorwayH;
+            Box("Wall", new Vector3(edge.x, doorwayH + topH * 0.5f, edge.z),
+                new Vector3(L, topH, T), wallMaterial, true);
+
+            // 2. Left jamb wall
+            float leftX = edge.x - doorwayW * 0.5f - sideW * 0.5f;
+            Box("Wall", new Vector3(leftX, doorwayH * 0.5f, edge.z),
+                new Vector3(sideW, doorwayH, T), wallMaterial, false);
+
+            // 3. Right jamb wall
+            float rightX = edge.x + doorwayW * 0.5f + sideW * 0.5f;
+            Box("Wall", new Vector3(rightX, doorwayH * 0.5f, edge.z),
+                new Vector3(sideW, doorwayH, T), wallMaterial, false);
+
+            if (baseboardMaterial != null)
+            {
+                Vector3 inward = -dir;
+                Vector3 p = edge + inward * (wallThickness / 2f + 0.02f);
+                float bbSideW = (tileSize - doorwayW) * 0.5f;
+                if (bbSideW > 0.05f)
+                {
+                    float bbLeftX = p.x - doorwayW * 0.5f - bbSideW * 0.5f;
+                    float bbRightX = p.x + doorwayW * 0.5f + bbSideW * 0.5f;
+                    Box("Baseboard", new Vector3(bbLeftX, 0.075f, p.z), new Vector3(bbSideW, 0.15f, 0.04f), baseboardMaterial, true);
+                    Box("Baseboard", new Vector3(bbRightX, 0.075f, p.z), new Vector3(bbSideW, 0.15f, 0.04f), baseboardMaterial, true);
+                }
+            }
+        }
+        else
+        {
+            // 1. Top lintel wall above door opening (ignored by NavMesh bake)
+            float topH = H - doorwayH;
+            Box("Wall", new Vector3(edge.x, doorwayH + topH * 0.5f, edge.z),
+                new Vector3(T, topH, L), wallMaterial, true);
+
+            // 2. Left/back jamb wall along Z
+            float leftZ = edge.z - doorwayW * 0.5f - sideW * 0.5f;
+            Box("Wall", new Vector3(edge.x, doorwayH * 0.5f, leftZ),
+                new Vector3(T, doorwayH, sideW), wallMaterial, false);
+
+            // 3. Right/forward jamb wall along Z
+            float rightZ = edge.z + doorwayW * 0.5f + sideW * 0.5f;
+            Box("Wall", new Vector3(edge.x, doorwayH * 0.5f, rightZ),
+                new Vector3(T, doorwayH, sideW), wallMaterial, false);
+
+            if (baseboardMaterial != null)
+            {
+                Vector3 inward = -dir;
+                Vector3 p = edge + inward * (wallThickness / 2f + 0.02f);
+                float bbSideW = (tileSize - doorwayW) * 0.5f;
+                if (bbSideW > 0.05f)
+                {
+                    float bbLeftZ = p.z - doorwayW * 0.5f - bbSideW * 0.5f;
+                    float bbRightZ = p.z + doorwayW * 0.5f + bbSideW * 0.5f;
+                    Box("Baseboard", new Vector3(p.x, 0.075f, bbLeftZ), new Vector3(0.04f, 0.15f, bbSideW), baseboardMaterial, true);
+                    Box("Baseboard", new Vector3(p.x, 0.075f, bbRightZ), new Vector3(0.04f, 0.15f, bbSideW), baseboardMaterial, true);
+                }
+            }
+        }
+    }
+
+    void PlaceLockerInRoom(RectInt r, List<Vector3> doorPositions, int[] dx, int[] dz)
+    {
+        List<Vector2Int> candidates = new List<Vector2Int>();
+        for (int x = r.x; x < r.x + r.width; x++)
+        {
+            for (int z = r.y; z < r.y + r.height; z++)
+            {
+                if (reservedExitCell.x >= 0 && Mathf.Abs(reservedExitCell.x - x) <= 1 && Mathf.Abs(reservedExitCell.y - z) <= 1)
+                    continue;
+
+                Vector3 cellPos = CellCenter(x, z);
+                bool tooCloseToDoor = false;
+                for (int dp = 0; dp < doorPositions.Count; dp++)
+                {
+                    if (Vector3.Distance(cellPos, doorPositions[dp]) < 1.8f)
+                    {
+                        tooCloseToDoor = true;
+                        break;
+                    }
+                }
+                if (tooCloseToDoor) continue;
+
+                candidates.Add(new Vector2Int(x, z));
+            }
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            int rnd = Random.Range(i, candidates.Count);
+            var tmp = candidates[i];
+            candidates[i] = candidates[rnd];
+            candidates[rnd] = tmp;
+        }
+
+        foreach (var c in candidates)
+        {
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = c.x + dx[d];
+                int nz = c.y + dz[d];
+
+                if (!IsFloor(nx, nz))
+                {
+                    Vector3 backDir = new Vector3(dx[d], 0, dz[d]);
+                    Vector3 lockerPos = CellCenter(c.x, c.y) + backDir * (tileSize * 0.5f - LockerHideSpot.LockerDepth * 0.5f);
+                    Vector3 facingDir = -backDir;
+
+                    LockerHideSpot.Create(root, lockerPos, facingDir, lockerExteriorMaterial, lockerInteriorMaterial);
+                    return;
+                }
+            }
+        }
     }
 }

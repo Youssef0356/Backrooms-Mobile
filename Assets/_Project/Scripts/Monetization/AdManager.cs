@@ -327,7 +327,7 @@ public class AdManager : MonoBehaviour
         simBackdrop.Add(card);
 
         simTitleLabel = new Label("EMERGENCY BROADCAST TRANSMISSION");
-        simTitleLabel.style.fontSize = 15;
+        simTitleLabel.style.fontSize = 18;
         simTitleLabel.style.color = new Color(0.95f, 0.75f, 0.2f, 1f);
         simTitleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
         simTitleLabel.style.whiteSpace = WhiteSpace.Normal;
@@ -335,7 +335,7 @@ public class AdManager : MonoBehaviour
         card.Add(simTitleLabel);
 
         simTimerLabel = new Label("SIMULATING ADVERTISEMENT (2.4s)...");
-        simTimerLabel.style.fontSize = 13;
+        simTimerLabel.style.fontSize = 16;
         simTimerLabel.style.color = new Color(0.8f, 0.8f, 0.85f, 0.9f);
         simTimerLabel.style.marginBottom = 20;
         card.Add(simTimerLabel);

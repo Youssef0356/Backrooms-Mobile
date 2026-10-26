@@ -22,6 +22,8 @@ public class MainMenuController : MonoBehaviour
     [Tooltip("Optional monospace font. When empty the font is loaded from Resources.")]
     [SerializeField] Font uiFont;
     [SerializeField] string fontResourcePath = "Fonts/RobotoMono-Regular";
+    [Tooltip("If true, displays the high-resolution graphic title logo texture instead of the typed text.")]
+    [SerializeField] bool useGraphicTitleLogo = false;
 
     [Header("Effects")]
     [SerializeField] bool typingEffect = true;
@@ -37,6 +39,8 @@ public class MainMenuController : MonoBehaviour
     VisualElement root;
 
     Label titleLabel;
+    Label subtitleLabel;
+    VisualElement titleLogo;
     Label versionLabel;
     Label buildLabel;
     Label volumeValueLabel;
@@ -78,6 +82,7 @@ public class MainMenuController : MonoBehaviour
     int appliedScreenHeight;
 
     string titleText;
+    string subtitleText;
     Coroutine flickerRoutine;
     AudioSource menuMusic;
 
@@ -87,6 +92,8 @@ public class MainMenuController : MonoBehaviour
         root = document.rootVisualElement;
 
         titleLabel = root.Q<Label>("title");
+        subtitleLabel = root.Q<Label>("subtitle");
+        titleLogo = root.Q<VisualElement>("title-logo");
         versionLabel = root.Q<Label>("version-label");
         buildLabel = root.Q<Label>("build-label");
         volumeValueLabel = root.Q<Label>("volume-value");
@@ -124,6 +131,7 @@ public class MainMenuController : MonoBehaviour
         framerateDropdown = root.Q<DropdownField>("framerate-dropdown");
 
         if (titleLabel != null) titleText = titleLabel.text;
+        if (subtitleLabel != null) subtitleText = subtitleLabel.text;
     }
 
     void OnEnable()
@@ -137,7 +145,33 @@ public class MainMenuController : MonoBehaviour
         WireSettings();
         StartMenuMusic();
 
-        if (typingEffect && titleLabel != null) StartCoroutine(TypeTitle());
+        if (titleLogo != null)
+        {
+            if (useGraphicTitleLogo)
+            {
+                titleLogo.RemoveFromClassList("is-hidden");
+                titleLogo.style.display = DisplayStyle.Flex;
+            }
+            else
+            {
+                titleLogo.AddToClassList("is-hidden");
+                titleLogo.style.display = DisplayStyle.None;
+            }
+        }
+
+        if (titleLabel != null)
+        {
+            titleLabel.style.display = useGraphicTitleLogo ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        if (subtitleLabel != null)
+        {
+            subtitleLabel.style.display = useGraphicTitleLogo ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        if (!useGraphicTitleLogo && typingEffect && (titleLabel != null || subtitleLabel != null))
+            StartCoroutine(TypeTitle());
+
         if (flickerEffect) flickerRoutine = StartCoroutine(Flicker());
     }
 
@@ -195,10 +229,17 @@ public class MainMenuController : MonoBehaviour
         if (tabTouch != null) tabTouch.clicked += () => SwitchControlsTab(touchMode: true);
         if (tabKeyboard != null) tabKeyboard.clicked += () => SwitchControlsTab(touchMode: false);
 
+        UpdatePlatformControls();
+    }
+
+    void UpdatePlatformControls()
+    {
         bool isMobile = PlatformUtils.IsMobile;
         if (isMobile)
         {
-            if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.Flex;
+            // On mobile (Android / iOS): show touch controls directly, hide tabs and keyboard controls
+            if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.None;
+            if (tabKeyboard != null) tabKeyboard.style.display = DisplayStyle.None;
             if (tabTouch != null) tabTouch.style.display = DisplayStyle.Flex;
             SwitchControlsTab(touchMode: true);
 
@@ -209,6 +250,7 @@ public class MainMenuController : MonoBehaviour
         {
             // On PC / Desktop: hide touch tab and controls tabs bar so only PC keyboard/mouse controls show
             if (tabTouch != null) tabTouch.style.display = DisplayStyle.None;
+            if (tabKeyboard != null) tabKeyboard.style.display = DisplayStyle.Flex;
             if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.None;
             SwitchControlsTab(touchMode: false);
 
@@ -223,15 +265,33 @@ public class MainMenuController : MonoBehaviour
         {
             tabTouch?.AddToClassList("is-tab-active");
             tabKeyboard?.RemoveFromClassList("is-tab-active");
-            touchContainer?.RemoveFromClassList("is-hidden");
-            keyboardContainer?.AddToClassList("is-hidden");
+
+            if (touchContainer != null)
+            {
+                touchContainer.RemoveFromClassList("is-hidden");
+                touchContainer.style.display = DisplayStyle.Flex;
+            }
+            if (keyboardContainer != null)
+            {
+                keyboardContainer.AddToClassList("is-hidden");
+                keyboardContainer.style.display = DisplayStyle.None;
+            }
         }
         else
         {
             tabKeyboard?.AddToClassList("is-tab-active");
             tabTouch?.RemoveFromClassList("is-tab-active");
-            keyboardContainer?.RemoveFromClassList("is-hidden");
-            touchContainer?.AddToClassList("is-hidden");
+
+            if (keyboardContainer != null)
+            {
+                keyboardContainer.RemoveFromClassList("is-hidden");
+                keyboardContainer.style.display = DisplayStyle.Flex;
+            }
+            if (touchContainer != null)
+            {
+                touchContainer.AddToClassList("is-hidden");
+                touchContainer.style.display = DisplayStyle.None;
+            }
         }
     }
 
@@ -507,13 +567,7 @@ public class MainMenuController : MonoBehaviour
         settingsPanel?.AddToClassList("is-hidden");
         controlsPanel?.RemoveFromClassList("is-hidden");
 
-        bool isMobile = PlatformUtils.IsMobile;
-        if (!isMobile)
-        {
-            if (tabTouch != null) tabTouch.style.display = DisplayStyle.None;
-            if (controlsTabs != null) controlsTabs.style.display = DisplayStyle.None;
-            SwitchControlsTab(touchMode: false);
-        }
+        UpdatePlatformControls();
 
         controlsCloseButton?.Focus();
     }
@@ -534,17 +588,32 @@ public class MainMenuController : MonoBehaviour
 
     IEnumerator TypeTitle()
     {
-        if (titleLabel == null) yield break;
+        if (titleLabel != null)
+            titleLabel.text = string.Empty;
 
-        titleLabel.text = string.Empty;
+        if (subtitleLabel != null)
+            subtitleLabel.text = string.Empty;
 
-        for (int i = 0; i < titleText.Length; i++)
+        if (titleLabel != null && !string.IsNullOrEmpty(titleText))
         {
-            titleLabel.text = titleText.Substring(0, i + 1) + "_";
-            yield return new WaitForSecondsRealtime(typingSpeed);
+            for (int i = 0; i < titleText.Length; i++)
+            {
+                titleLabel.text = titleText.Substring(0, i + 1) + "_";
+                yield return new WaitForSecondsRealtime(typingSpeed);
+            }
+            titleLabel.text = titleText;
         }
 
-        titleLabel.text = titleText;
+        if (subtitleLabel != null && !string.IsNullOrEmpty(subtitleText))
+        {
+            yield return new WaitForSecondsRealtime(typingSpeed * 1.5f);
+            for (int i = 0; i < subtitleText.Length; i++)
+            {
+                subtitleLabel.text = subtitleText.Substring(0, i + 1) + "_";
+                yield return new WaitForSecondsRealtime(typingSpeed);
+            }
+            subtitleLabel.text = subtitleText;
+        }
     }
 
     IEnumerator Flicker()

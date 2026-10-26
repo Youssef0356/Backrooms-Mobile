@@ -309,7 +309,7 @@ public class PlayerStaminaHUD : MonoBehaviour
 
         titleLabel = new Label("STAMINA");
         titleLabel.pickingMode = PickingMode.Ignore;
-        titleLabel.style.fontSize = 11f;
+        titleLabel.style.fontSize = 14f;
         titleLabel.style.color = colorOptimal;
         titleLabel.style.letterSpacing = 1.5f;
         ApplyFont(titleLabel);
@@ -317,7 +317,7 @@ public class PlayerStaminaHUD : MonoBehaviour
 
         statusLabel = new Label("[RESTED]");
         statusLabel.pickingMode = PickingMode.Ignore;
-        statusLabel.style.fontSize = 10f;
+        statusLabel.style.fontSize = 13f;
         statusLabel.style.color = colorOptimal * 0.75f;
         statusLabel.style.letterSpacing = 1.0f;
         ApplyFont(statusLabel);
@@ -325,7 +325,7 @@ public class PlayerStaminaHUD : MonoBehaviour
 
         percentLabel = new Label("100%");
         percentLabel.pickingMode = PickingMode.Ignore;
-        percentLabel.style.fontSize = 11f;
+        percentLabel.style.fontSize = 14f;
         percentLabel.style.color = colorOptimal;
         percentLabel.style.letterSpacing = 1.0f;
         ApplyFont(percentLabel);

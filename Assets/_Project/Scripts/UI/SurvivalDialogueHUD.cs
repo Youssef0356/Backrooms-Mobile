@@ -521,7 +521,7 @@ public class SurvivalDialogueHUD : MonoBehaviour
         badgeLabel = new Label("● SURVIVAL PROTOCOL");
         badgeLabel.pickingMode = PickingMode.Ignore;
         if (font != null) badgeLabel.style.unityFont = font;
-        badgeLabel.style.fontSize = 12f;
+        badgeLabel.style.fontSize = 15f;
         badgeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
         badgeLabel.style.color = new Color(0.88f, 0.85f, 0.46f, 1f);
         badgeLabel.style.letterSpacing = 1.2f;
@@ -531,8 +531,8 @@ public class SurvivalDialogueHUD : MonoBehaviour
         dismissHintLabel = new Label("[TAP TO SKIP]");
         dismissHintLabel.pickingMode = PickingMode.Ignore;
         if (font != null) dismissHintLabel.style.unityFont = font;
-        dismissHintLabel.style.fontSize = 10f;
-        dismissHintLabel.style.color = new Color(0.88f, 0.85f, 0.46f, 0.45f);
+        dismissHintLabel.style.fontSize = 13f;
+        dismissHintLabel.style.color = new Color(0.88f, 0.85f, 0.46f, 0.55f);
         dismissHintLabel.style.letterSpacing = 1f;
         headerRow.Add(dismissHintLabel);
 
@@ -540,7 +540,7 @@ public class SurvivalDialogueHUD : MonoBehaviour
         messageLabel = new Label();
         messageLabel.pickingMode = PickingMode.Ignore;
         if (font != null) messageLabel.style.unityFont = font;
-        messageLabel.style.fontSize = 15f;
+        messageLabel.style.fontSize = 18f;
         messageLabel.style.color = new Color(0.92f, 0.91f, 0.82f, 1f);
         messageLabel.style.whiteSpace = WhiteSpace.Normal;
         banner.Add(messageLabel);

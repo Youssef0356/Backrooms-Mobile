@@ -335,12 +335,12 @@ public class InventoryHUD : MonoBehaviour
         row.style.marginBottom = 6;
 
         sanityTitleLabel = new Label("SANITY MONITOR");
-        ApplyFont(sanityTitleLabel, 11, true);
+        ApplyFont(sanityTitleLabel, 14, true);
         sanityTitleLabel.style.color = colorPhosphor * 0.8f;
         row.Add(sanityTitleLabel);
 
         sanityPercentLabel = new Label("100% [LUCID]");
-        ApplyFont(sanityPercentLabel, 11, true);
+        ApplyFont(sanityPercentLabel, 14, true);
         sanityPercentLabel.style.color = colorPhosphor;
         row.Add(sanityPercentLabel);
 
@@ -398,18 +398,18 @@ public class InventoryHUD : MonoBehaviour
 
         // Small top icon/tag
         Label iconTag = new Label("ALMOND");
-        ApplyFont(iconTag, 9, true);
+        ApplyFont(iconTag, 12, true);
         iconTag.style.color = colorPhosphor * 0.75f;
         btn.Add(iconTag);
 
         mobileDrinkLabel = new Label("DRINK");
-        ApplyFont(mobileDrinkLabel, 14, true);
+        ApplyFont(mobileDrinkLabel, 16, true);
         mobileDrinkLabel.style.color = colorPhosphor;
         btn.Add(mobileDrinkLabel);
 
         // Quantity Badge (Upper-Right corner)
         mobileBadgeLabel = new Label("x0");
-        ApplyFont(mobileBadgeLabel, 11, true);
+        ApplyFont(mobileBadgeLabel, 13, true);
         mobileBadgeLabel.style.position = Position.Absolute;
         mobileBadgeLabel.style.top = -4;
         mobileBadgeLabel.style.right = -4;
@@ -515,13 +515,13 @@ public class InventoryHUD : MonoBehaviour
         card.style.display = DisplayStyle.None;
 
         pickupKeyLabel = new Label(IsMobile ? "[TAP]" : "[E]");
-        ApplyFont(pickupKeyLabel, 15, true);
+        ApplyFont(pickupKeyLabel, 18, true);
         pickupKeyLabel.style.color = colorCaution;
         pickupKeyLabel.style.marginRight = 10;
         card.Add(pickupKeyLabel);
 
         pickupActionLabel = new Label("PICK UP ALMOND WATER");
-        ApplyFont(pickupActionLabel, 14, true);
+        ApplyFont(pickupActionLabel, 17, true);
         pickupActionLabel.style.color = colorPhosphor;
         card.Add(pickupActionLabel);
 

@@ -132,8 +132,9 @@ public class VillainAI : MonoBehaviour
     float ventLingerTimer;
     float ventLingerDuration;
 
-    /// <summary>True while the player is crouched inside a wall vent (he can't see, hear or catch the player).</summary>
-    public bool PlayerHiddenInVent => playerHiddenInVent;
+    /// <summary>True while the player is crouched inside a wall vent or locker (he can't see, hear or catch the player).</summary>
+    public bool PlayerHiddenInVent => playerHiddenInVent || PlayerVentController.IsInVent || PlayerLockerController.IsInLocker;
+    public bool PlayerIsHidden => PlayerHiddenInVent;
 
     NavMeshAgent agent;
     Animator anim;
@@ -237,12 +238,40 @@ public class VillainAI : MonoBehaviour
     void OnEnable()
     {
         PlayerNoiseEmitter.OnNoiseEmitted += OnNoiseHeard;
+        VictoryController.OnPlayerEscaped += HandlePlayerEscaped;
     }
 
     void OnDisable()
     {
         PlayerNoiseEmitter.OnNoiseEmitted -= OnNoiseHeard;
+        VictoryController.OnPlayerEscaped -= HandlePlayerEscaped;
         StopChaseAudio(fadeOut: false);
+    }
+
+    void HandlePlayerEscaped()
+    {
+        currentState = State.Wander;
+        SetChasing(false);
+        StopChaseAudio(fadeOut: false);
+
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            agent.ResetPath();
+        }
+
+        currentForwardSpeed = 0f;
+        isPivotingOnSpot = false;
+
+        if (anim != null)
+        {
+            if (hasAttack1) anim.ResetTrigger(attack1Hash);
+            if (hasAttack2) anim.ResetTrigger(attack2Hash);
+            if (hasSpeed) anim.SetFloat(speedHash, 0f);
+            if (hasChasing) anim.SetBool(chasingHash, false);
+            anim.speed = 0f;
+        }
     }
 
     void Start()
@@ -345,6 +374,30 @@ public class VillainAI : MonoBehaviour
 
     void Update()
     {
+        if (VictoryController.IsGameWon)
+        {
+            if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+            }
+            if (anim != null)
+            {
+                anim.speed = 0f;
+            }
+            return;
+        }
+
+        if (GameOverController.IsGameOver && !hasCaught)
+        {
+            if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+            }
+            return;
+        }
+
         if (reviveGraceTimer > 0f)
         {
             reviveGraceTimer -= Time.deltaTime;
@@ -430,7 +483,7 @@ public class VillainAI : MonoBehaviour
     void UpdateVentWait(bool canSee)
     {
         // Player came out while he is still standing guard: he spots them again
-        if (canSee && !playerHiddenInVent)
+        if (canSee && !PlayerIsHidden)
         {
             StartChasing();
             return;
@@ -684,6 +737,8 @@ public class VillainAI : MonoBehaviour
 
     void StartChasing()
     {
+        if (VictoryController.IsGameWon) return;
+
         currentState = State.Chase;
         agent.speed = chaseSpeed;
         if (agent.isActiveAndEnabled && agent.isOnNavMesh) agent.isStopped = false;
@@ -702,8 +757,8 @@ public class VillainAI : MonoBehaviour
 
     void OnNoiseHeard(Vector3 noiseOrigin, float radius)
     {
-        if (!canHear || player == null) return;
-        if (playerHiddenInVent) return;
+        if (VictoryController.IsGameWon || !canHear || player == null) return;
+        if (PlayerIsHidden) return;
         if (agent == null || !agent.isOnNavMesh) return;
 
         float dist = Vector3.Distance(transform.position, noiseOrigin);
@@ -733,7 +788,7 @@ public class VillainAI : MonoBehaviour
 
     bool CanSeePlayer()
     {
-        if (player == null || reviveGraceTimer > 0f || playerHiddenInVent) return false;
+        if (player == null || reviveGraceTimer > 0f || PlayerIsHidden) return false;
 
         if (cachedFlashlight == null)
             cachedFlashlight = player.GetComponentInChildren<Flashlight>();
@@ -882,7 +937,7 @@ public class VillainAI : MonoBehaviour
 
     void UpdateAntiStuckWatchdog()
     {
-        if (hasCaught || playerHiddenInVent || PlayerVentController.IsInVent) return;
+        if (hasCaught || PlayerIsHidden) return;
 
         bool isAttemptingMovement = (currentState == State.Wander || currentState == State.Investigate || currentState == State.Chase);
         if (!isAttemptingMovement || agent == null || !agent.isOnNavMesh || agent.isStopped)
@@ -1066,6 +1121,7 @@ public class VillainAI : MonoBehaviour
 
     void LateUpdate()
     {
+        if (VictoryController.IsGameWon) return;
         if (headBone == null || player == null) return;
 
         if (hasCaught)
@@ -1085,7 +1141,7 @@ public class VillainAI : MonoBehaviour
         }
 
         if (currentState == State.Wander && !CanSeePlayer()) return;
-        if (playerHiddenInVent) return;   // he must not "know" where the hidden player is
+        if (PlayerIsHidden) return;   // he must not "know" where the hidden player is
 
         // When hunting, investigating, or chasing, head tracks the player
         Vector3 targetPoint = player.position + Vector3.up * 1.4f;
@@ -1121,6 +1177,7 @@ public class VillainAI : MonoBehaviour
 
     void UpdateAttack()
     {
+        if (VictoryController.IsGameWon) return;
         if (anim == null || (!hasAttack1 && !hasAttack2)) return;
 
         attackTimer -= Time.deltaTime;
@@ -1138,7 +1195,7 @@ public class VillainAI : MonoBehaviour
 
     void OnCaughtPlayer()
     {
-        if (hasCaught || playerHiddenInVent || PlayerVentController.IsInVent) return;
+        if (hasCaught || VictoryController.IsGameWon || PlayerIsHidden) return;
         hasCaught = true;
         StopChaseAudio(fadeOut: false);
 

@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 /// </summary>
 public class VentHUD : MonoBehaviour
 {
-    public enum PromptMode { None, Enter, TooClose, Leave }
+    public enum PromptMode { None, Enter, TooClose, Leave, EnterLocker, LeaveLocker, OpenDoor, CloseDoor }
 
     public static VentHUD Instance { get; private set; }
 
@@ -142,6 +142,38 @@ public class VentHUD : MonoBehaviour
                 hintLabel.text = "look around with the mouse / swipe";
                 promptCard.style.borderLeftColor = colorAmber;
                 break;
+
+            case PromptMode.EnterLocker:
+                keyLabel.text = key;
+                actionLabel.text = "HIDE IN LOCKER";
+                actionLabel.style.color = colorAmber;
+                hintLabel.text = "step inside - he will lose you";
+                promptCard.style.borderLeftColor = colorAmber;
+                break;
+
+            case PromptMode.LeaveLocker:
+                keyLabel.text = key;
+                actionLabel.text = "LEAVE LOCKER";
+                actionLabel.style.color = colorAmber;
+                hintLabel.text = "peer through louvers / swipe to look";
+                promptCard.style.borderLeftColor = colorAmber;
+                break;
+
+            case PromptMode.OpenDoor:
+                keyLabel.text = key;
+                actionLabel.text = "OPEN DOOR";
+                actionLabel.style.color = colorAmber;
+                hintLabel.text = "open room door";
+                promptCard.style.borderLeftColor = colorAmber;
+                break;
+
+            case PromptMode.CloseDoor:
+                keyLabel.text = key;
+                actionLabel.text = "CLOSE DOOR";
+                actionLabel.style.color = colorAmber;
+                hintLabel.text = "pull door shut";
+                promptCard.style.borderLeftColor = colorAmber;
+                break;
         }
     }
 
@@ -195,7 +227,7 @@ public class VentHUD : MonoBehaviour
         hiddenLabel.style.left = 0f;
         hiddenLabel.style.right = 0f;
         hiddenLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-        hiddenLabel.style.fontSize = 16f;
+        hiddenLabel.style.fontSize = 18f;
         hiddenLabel.style.letterSpacing = 4f;
         hiddenLabel.style.color = colorAmber;
         hiddenLabel.style.display = DisplayStyle.None;
@@ -238,7 +270,7 @@ public class VentHUD : MonoBehaviour
         promptCard.style.display = DisplayStyle.None;
         promptCard.RegisterCallback<PointerDownEvent>(evt =>
         {
-            if (mode == PromptMode.Enter || mode == PromptMode.Leave)
+            if (mode != PromptMode.None && mode != PromptMode.TooClose)
             {
                 OnActionPressed?.Invoke();
                 evt.StopPropagation();
@@ -277,7 +309,7 @@ public class VentHUD : MonoBehaviour
 
         hintLabel = new Label("");
         hintLabel.pickingMode = PickingMode.Ignore;
-        hintLabel.style.fontSize = 11f;
+        hintLabel.style.fontSize = 14f;
         hintLabel.style.letterSpacing = 1f;
         hintLabel.style.color = new Color(0.88f, 0.85f, 0.46f, 0.6f);
         ApplyFont(hintLabel);

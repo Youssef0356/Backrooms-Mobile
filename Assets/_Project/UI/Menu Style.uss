@@ -85,16 +85,24 @@
 }
 
 .eyebrow {
-    font-size: 15px;
+    font-size: 18px;
     letter-spacing: 5px;
     color: var(--accent-dim);
     -unity-text-align: middle-left;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
+}
+
+.title-logo {
+    width: 520px;
+    height: 204px;
+    background-image: url("../Art/UI/Logo/backrooms_no_exit_title_transparent_cropped.png");
+    -unity-background-scale-mode: scale-to-fit;
+    margin-bottom: 6px;
 }
 
 .title {
-    font-size: 82px;
-    letter-spacing: 10px;
+    font-size: 72px;
+    letter-spacing: 8px;
     -unity-font-style: bold;
     color: var(--accent);
     -unity-text-align: middle-left;
@@ -102,22 +110,24 @@
 
 /* the only glow in the menu */
 .menu-root .title {
-    text-shadow: 0 0 22px rgba(223, 216, 118, 0.30);
+    text-shadow: 0 0 22px rgba(223, 216, 118, 0.35);
 }
 
 .subtitle {
-    font-size: 24px;
-    letter-spacing: 9px;
-    color: var(--muted);
+    font-size: 42px;
+    letter-spacing: 12px;
+    -unity-font-style: bold;
+    color: rgb(225, 58, 48);
     -unity-text-align: middle-left;
-    margin-top: 2px;
+    margin-top: 4px;
+    text-shadow: 0 0 20px rgba(225, 58, 48, 0.55);
 }
 
 .divider {
     height: 2px;
     background-color: var(--line);
-    margin-top: 22px;
-    margin-bottom: 16px;
+    margin-top: 18px;
+    margin-bottom: 14px;
 }
 
 /* ============================== menu buttons =============================== */
@@ -214,9 +224,9 @@
 
 .hint {
     margin-top: 22px;
-    font-size: 14px;
+    font-size: 18px;
     letter-spacing: 4px;
-    color: rgba(228, 224, 178, 0.35);
+    color: rgba(228, 224, 178, 0.45);
     -unity-text-align: middle-left;
 }
 
@@ -247,7 +257,7 @@
 
 .build-label {
     margin-top: 3px;
-    font-size: 12px;
+    font-size: 15px;
     letter-spacing: 4px;
     color: var(--muted);
     -unity-text-align: upper-right;
@@ -263,7 +273,7 @@
 }
 
 .rec-label {
-    font-size: 13px;
+    font-size: 16px;
     letter-spacing: 5px;
     -unity-font-style: bold;
     color: rgba(196, 92, 74, 0.85);
@@ -271,9 +281,9 @@
 
 .hum-label {
     margin-top: 4px;
-    font-size: 12px;
+    font-size: 15px;
     letter-spacing: 4px;
-    color: rgba(228, 224, 178, 0.28);
+    color: rgba(228, 224, 178, 0.40);
 }
 
 /* ============================== overlays =================================== */
@@ -290,6 +300,10 @@
 }
 
 .overlay.is-hidden {
+    display: none;
+}
+
+.is-hidden {
     display: none;
 }
 
@@ -366,14 +380,14 @@
 }
 
 .setting-slider .unity-base-field__label {
-    font-size: 19px;
+    font-size: 21px;
     letter-spacing: 3px;
     color: var(--text);
 }
 
 .setting-value {
     margin-top: 2px;
-    font-size: 18px;
+    font-size: 20px;
     letter-spacing: 3px;
     color: var(--accent);
     -unity-text-align: upper-right;
@@ -386,7 +400,7 @@
 }
 
 .setting-group-label {
-    font-size: 19px;
+    font-size: 21px;
     letter-spacing: 3px;
     color: var(--text);
     margin-bottom: 8px;
@@ -408,7 +422,7 @@
     border-color: rgba(223, 216, 118, 0.25);
     border-radius: 4px;
     color: var(--muted);
-    font-size: 16px;
+    font-size: 18px;
     letter-spacing: 2px;
     -unity-text-align: middle-center;
     padding-left: 4px;
@@ -440,7 +454,7 @@
 
 .setting-dropdown .unity-base-field__label {
     letter-spacing: 3px;
-    font-size: 17px;
+    font-size: 19px;
     color: var(--text);
 }
 
@@ -508,7 +522,7 @@
 
 .key {
     width: 170px;
-    font-size: 18px;
+    font-size: 20px;
     letter-spacing: 3px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -517,7 +531,7 @@
 
 .key-desc {
     flex-grow: 1;
-    font-size: 17px;
+    font-size: 19px;
     letter-spacing: 3px;
     color: var(--muted);
     -unity-text-align: middle-left;
@@ -533,8 +547,8 @@
 
 .controls-tab-btn {
     flex-grow: 1;
-    height: 44px;
-    font-size: 16px;
+    height: 48px;
+    font-size: 18px;
     letter-spacing: 3px;
     -unity-font-style: bold;
     color: var(--muted);

@@ -75,7 +75,7 @@ public class BackroomsBlackoutEvent : MonoBehaviour
             float waitTime = Random.Range(minInterval, maxInterval);
             yield return new WaitForSeconds(waitTime);
 
-            if (!GameOverController.IsGameOver && !PauseMenuController.IsPaused)
+            if (!GameOverController.IsGameOver && !PauseMenuController.IsPaused && !VictoryController.IsGameWon)
             {
                 yield return StartCoroutine(ExecuteBlackoutRoutine());
             }

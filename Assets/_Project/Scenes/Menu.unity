@@ -138,7 +138,7 @@ PrefabInstance:
     - target: {fileID: -4748361991329772099, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 61d631f2705b04b4aa5bf26cf6157772, type: 2}
+      objectReference: {fileID: 0}
     - target: {fileID: -3910990755373119420, guid: bedf836e39d02f64aac89119af6b66d7, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.16
@@ -507,6 +507,7 @@ MonoBehaviour:
   gameSceneName: MainLevel
   uiFont: {fileID: 12800000, guid: f60718293a4b5c6d7e8f90a1b2c3d4e5, type: 3}
   fontResourcePath: Fonts/RobotoMono-Regular
+  useGraphicTitleLogo: 0
   typingEffect: 1
   typingSpeed: 0.06
   flickerEffect: 1

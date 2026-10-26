@@ -83,7 +83,7 @@
     position: absolute;
     top: 24px;
     left: 32px;
-    font-size: 14px;
+    font-size: 16px;
     letter-spacing: 4px;
     -unity-font-style: bold;
     color: var(--danger-bright);
@@ -93,7 +93,7 @@
     position: absolute;
     top: 24px;
     right: 32px;
-    font-size: 14px;
+    font-size: 16px;
     letter-spacing: 4px;
     color: var(--danger-dim);
 }
@@ -122,7 +122,7 @@
 .gameover-subheading {
     margin-top: 6px;
     margin-bottom: 12px;
-    font-size: 12px;
+    font-size: 16px;
     letter-spacing: 4px;
     color: var(--text-dim);
     -unity-text-align: middle-center;
@@ -154,13 +154,13 @@
 }
 
 .gameover-stat-label {
-    font-size: 14px;
+    font-size: 17px;
     letter-spacing: 3px;
     color: var(--text-dim);
 }
 
 .gameover-stat-value {
-    font-size: 14px;
+    font-size: 17px;
     letter-spacing: 3px;
     -unity-font-style: bold;
     color: var(--accent);
@@ -175,7 +175,7 @@
 .gameover-button {
     margin-top: 12px;
     height: 52px;
-    font-size: 19px;
+    font-size: 21px;
     letter-spacing: 6px;
     -unity-font-style: bold;
     color: var(--text);

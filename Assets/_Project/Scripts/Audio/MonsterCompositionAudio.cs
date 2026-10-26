@@ -217,6 +217,12 @@ public class MonsterCompositionAudio : MonoBehaviour
             float delay = Random.Range(minInterval, maxInterval);
             yield return new WaitForSeconds(delay);
 
+            if (GameOverController.IsGameOver || VictoryController.IsGameWon)
+            {
+                yield return new WaitForSeconds(1.0f);
+                continue;
+            }
+
             FindVillain();
 
             // When the monster is actively chasing the player, pause ambient spot audio

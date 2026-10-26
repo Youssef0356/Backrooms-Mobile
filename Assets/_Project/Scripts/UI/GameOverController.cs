@@ -112,7 +112,7 @@ public class GameOverController : MonoBehaviour
     /// </summary>
     public static void TriggerDefeat(Transform killer = null)
     {
-        if (IsGameOver) return;
+        if (IsGameOver || VictoryController.IsGameWon) return;
 
         if (Instance == null)
         {
@@ -125,7 +125,7 @@ public class GameOverController : MonoBehaviour
 
     public void StartGameOverSequence(Transform killer)
     {
-        if (IsGameOver) return;
+        if (IsGameOver || VictoryController.IsGameWon) return;
         IsGameOver = true;
 
         timeSurvived = Time.timeSinceLevelLoad;
