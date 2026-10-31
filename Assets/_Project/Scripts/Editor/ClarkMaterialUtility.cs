@@ -13,7 +13,7 @@ public static class ClarkMaterialUtility
         EditorApplication.delayCall += Execute;
     }
 
-    [MenuItem("Tools/Backrooms/Setup Clark Editable Materials")]
+    [MenuItem("Tools/Backrooms/Entities/Pirate Clark/Setup Clark Editable Materials")]
     public static void Execute()
     {
         if (!Directory.Exists(MaterialsFolder))
@@ -67,7 +67,7 @@ public static class ClarkMaterialUtility
         ApplyMaterialsToSceneClark();
     }
 
-    [MenuItem("Tools/Backrooms/Apply Editable Materials to Scene Clark")]
+    [MenuItem("Tools/Backrooms/Entities/Pirate Clark/Apply Editable Materials to Scene Clark")]
     public static void ApplyMaterialsToSceneClark()
     {
         GameObject clarkInScene = GameObject.Find("Clark");

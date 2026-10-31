@@ -238,32 +238,24 @@ namespace StarterAssets
 			float targetSpeed = _isSprinting ? SprintSpeed : MoveSpeed;
 			if (!isMoving) targetSpeed = 0.0f;
 
-			// a reference to the players current horizontal velocity
-			float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
-
-			float speedOffset = 0.1f;
 			float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
-			// accelerate or decelerate to target speed with responsive linear rate
-			if (currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset)
-			{
-				_speed = Mathf.MoveTowards(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * SpeedChangeRate * 3.5f);
-				_speed = Mathf.Round(_speed * 1000f) / 1000f;
-			}
-			else
-			{
-				_speed = targetSpeed * inputMagnitude;
-			}
+			// Accelerate smoothly and responsively towards target speed
+			_speed = Mathf.MoveTowards(_speed, targetSpeed * inputMagnitude, Time.deltaTime * SpeedChangeRate);
+			_speed = Mathf.Round(_speed * 1000f) / 1000f;
 
 			// normalise input direction
 			Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
 
-			// note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-			// if there is a move input rotate player when the player is moving
 			if (_input.move != Vector2.zero)
 			{
-				// move
 				inputDirection = transform.right * _input.move.x + transform.forward * _input.move.y;
+			}
+
+			// Smooth slope projection: prevents jittering, snagging, or speed drops when running up/down rolling hills
+			if (Grounded && Physics.Raycast(transform.position + Vector3.up * 0.25f, Vector3.down, out RaycastHit slopeHit, 0.85f, GroundLayers, QueryTriggerInteraction.Ignore))
+			{
+				inputDirection = Vector3.ProjectOnPlane(inputDirection, slopeHit.normal);
 			}
 
 			// move the player
@@ -277,10 +269,76 @@ namespace StarterAssets
 					_verticalVelocity = -0.5f;
 				}
 			}
+
+			// Dynamic Sprint FOV
+			UpdateSprintFov();
+		}
+
+		private Component _cachedCinemachineCam;
+		private System.Reflection.PropertyInfo _lensProperty;
+		private System.Reflection.FieldInfo _fovField;
+		private float _baseFov = 65f;
+		private bool _fovInitialized = false;
+
+		private void UpdateSprintFov()
+		{
+			if (!_fovInitialized)
+			{
+				var pfc = GameObject.Find("PlayerFollowCamera");
+				if (pfc != null)
+				{
+					foreach (var comp in pfc.GetComponents<Component>())
+					{
+						if (comp != null && comp.GetType().Name == "CinemachineCamera")
+						{
+							_cachedCinemachineCam = comp;
+							_lensProperty = comp.GetType().GetProperty("Lens");
+							if (_lensProperty != null)
+							{
+								var lensVal = _lensProperty.GetValue(comp);
+								if (lensVal != null)
+								{
+									var fovField = lensVal.GetType().GetField("FieldOfView");
+									if (fovField != null)
+									{
+										_fovField = fovField;
+										_baseFov = (float)fovField.GetValue(lensVal);
+										_fovInitialized = true;
+									}
+								}
+							}
+							break;
+						}
+					}
+				}
+				if (!_fovInitialized) _fovInitialized = true;
+			}
+
+			if (_cachedCinemachineCam != null && _lensProperty != null && _fovField != null)
+			{
+				var lensVal = _lensProperty.GetValue(_cachedCinemachineCam);
+				if (lensVal != null)
+				{
+					float currentFov = (float)_fovField.GetValue(lensVal);
+					float targetFov = _isSprinting && _speed > MoveSpeed + 0.5f ? _baseFov + 10f : _baseFov;
+					float newFov = Mathf.Lerp(currentFov, targetFov, Time.deltaTime * 6.5f);
+					_fovField.SetValue(lensVal, newFov);
+					_lensProperty.SetValue(_cachedCinemachineCam, lensVal);
+				}
+			}
 		}
 
 		private void JumpAndGravity()
 		{
+			// If controller is disabled (e.g. scripted sequence, sitting on couch, hiding in locker), keep velocity neutral
+			if (_controller != null && !_controller.enabled)
+			{
+				_verticalVelocity = -2f;
+				_fallTimeoutDelta = FallTimeout;
+				_jumpTimeoutDelta = JumpTimeout;
+				return;
+			}
+
 			if (Grounded)
 			{
 				// reset the fall timeout timer

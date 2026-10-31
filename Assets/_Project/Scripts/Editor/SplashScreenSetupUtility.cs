@@ -6,9 +6,7 @@ public static class SplashScreenSetupUtility
 {
     const string LogoPath = "Assets/_Project/Art/UI/Logo/backrooms_no_exit_title_transparent_cropped.png";
 
-    [InitializeOnLoadMethod]
-    [MenuItem("Backrooms/Configure Native Splash Screen", false, 0)]
-    [MenuItem("Tools/Backrooms/Configure Native Splash Screen", false, 0)]
+    [MenuItem("Tools/Backrooms/Build & Mobile/Configure Native Splash Screen")]
     public static void ConfigureNativeSplashScreen()
     {
         Sprite logoSprite = AssetDatabase.LoadAssetAtPath<Sprite>(LogoPath);

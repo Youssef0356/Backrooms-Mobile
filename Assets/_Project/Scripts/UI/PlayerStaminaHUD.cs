@@ -153,15 +153,17 @@ public class PlayerStaminaHUD : MonoBehaviour
             string currentStatus;
             Color statusCol;
 
+            bool inPursuit = ChaseSoundtrackDirector.IsPursuitActive;
+
             if (isExhausted)
             {
-                currentStatus = "[EXHAUSTED]";
+                currentStatus = inPursuit ? "[⚠️ EXHAUSTED - DANGER!]" : "[EXHAUSTED]";
                 statusCol = colorDanger;
             }
             else if (PlayerStamina.Instance != null && PlayerStamina.Instance.IsSprinting)
             {
-                currentStatus = "[DRAINING]";
-                statusCol = colorMid;
+                currentStatus = inPursuit ? "[⚠️ SPRINTING FOR LIFE!]" : "[DRAINING]";
+                statusCol = inPursuit ? colorDanger : colorMid;
             }
             else if (displayedNormalizedStamina < 0.99f)
             {
@@ -182,19 +184,46 @@ public class PlayerStaminaHUD : MonoBehaviour
             }
         }
 
-        // Auto-fade logic
-        if (autoHideWhenFull && displayedNormalizedStamina >= 0.995f && !isExhausted)
+        // Auto-fade & pursuit pressure dynamics
+        bool pursuitActive = ChaseSoundtrackDirector.IsPursuitActive;
+        if (pursuitActive)
         {
-            fullTimer += dt;
-            if (fullTimer >= autoHideDelay)
-            {
-                currentOpacity = Mathf.MoveTowards(currentOpacity, 0f, dt * 2.5f);
-            }
+            fullTimer = 0f;
+            currentOpacity = 1f;
+
+            float hb = ChaseSoundtrackDirector.CurrentHeartbeatPulse;
+            Color pursuitBorder = Color.Lerp(colorCardBorder, colorDanger, hb * 0.85f);
+            card.style.borderTopColor = new StyleColor(pursuitBorder);
+            card.style.borderBottomColor = new StyleColor(pursuitBorder);
+            card.style.borderLeftColor = new StyleColor(pursuitBorder);
+            card.style.borderRightColor = new StyleColor(pursuitBorder);
+
+            // Subtle panic jitter on stamina gauge matching camera impacts
+            float jitterX = (UnityEngine.Random.value * 2f - 1f) * (1.0f + 1.5f * hb);
+            float jitterY = (UnityEngine.Random.value * 2f - 1f) * (1.0f + 1.5f * hb);
+            card.style.translate = new StyleTranslate(new Translate(jitterX, jitterY, 0));
         }
         else
         {
-            fullTimer = 0f;
-            currentOpacity = Mathf.MoveTowards(currentOpacity, 1f, dt * 6.0f);
+            card.style.borderTopColor = new StyleColor(colorCardBorder);
+            card.style.borderBottomColor = new StyleColor(colorCardBorder);
+            card.style.borderLeftColor = new StyleColor(colorCardBorder);
+            card.style.borderRightColor = new StyleColor(colorCardBorder);
+            card.style.translate = new StyleTranslate(new Translate(0, 0, 0));
+
+            if (autoHideWhenFull && displayedNormalizedStamina >= 0.995f && !isExhausted)
+            {
+                fullTimer += dt;
+                if (fullTimer >= autoHideDelay)
+                {
+                    currentOpacity = Mathf.MoveTowards(currentOpacity, 0f, dt * 2.5f);
+                }
+            }
+            else
+            {
+                fullTimer = 0f;
+                currentOpacity = Mathf.MoveTowards(currentOpacity, 1f, dt * 6.0f);
+            }
         }
 
         card.style.opacity = currentOpacity;

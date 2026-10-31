@@ -193,6 +193,54 @@ public class BackroomsExitZone : MonoBehaviour
         return exitObj;
     }
 
+    /// <summary>
+    /// Procedurally builds a Level 0-style exit doorway for Level 94 that does NOT glow (no green light, no emission).
+    /// </summary>
+    public static GameObject BuildNonGlowingExitPortal(Vector3 position, Quaternion rotation, Material frameMat = null)
+    {
+        GameObject exitObj = new GameObject("BackroomsExit_NonGlowing");
+        exitObj.transform.position = position;
+        exitObj.transform.rotation = rotation;
+
+        // Trigger Collider: tightly scoped to the doorway opening
+        BoxCollider box = exitObj.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.size = new Vector3(1.5f, 2.3f, 0.7f);
+        box.center = new Vector3(0f, 1.15f, -0.15f);
+
+        exitObj.AddComponent<BackroomsExitZone>();
+
+        // Door frame - Left post, Right post, Top lintel
+        CreateBoxPart(exitObj.transform, "Exit_Frame_Left", new Vector3(-0.85f, 1.25f, 0f), new Vector3(0.18f, 2.5f, 0.28f), frameMat);
+        CreateBoxPart(exitObj.transform, "Exit_Frame_Right", new Vector3(0.85f, 1.25f, 0f), new Vector3(0.18f, 2.5f, 0.28f), frameMat);
+        CreateBoxPart(exitObj.transform, "Exit_Frame_Top", new Vector3(0f, 2.45f, 0f), new Vector3(1.88f, 0.18f, 0.28f), frameMat);
+
+        // Dark threshold / portal void behind the door frame
+        GameObject voidPlane = CreateBoxPart(exitObj.transform, "Exit_Threshold_Void", new Vector3(0f, 1.2f, 0.1f), new Vector3(1.55f, 2.3f, 0.08f), null);
+        var voidRend = voidPlane.GetComponent<Renderer>();
+        if (voidRend != null)
+        {
+            Material voidMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            voidMat.color = new Color(0.015f, 0.015f, 0.018f);
+            voidRend.sharedMaterial = voidMat;
+        }
+
+        // EXIT Sign Housing (Normal non-glowing sign, no emission!)
+        GameObject signBox = CreateBoxPart(exitObj.transform, "Exit_Sign_Housing", new Vector3(0f, 2.7f, 0f), new Vector3(0.85f, 0.32f, 0.16f), null);
+        var signRend = signBox.GetComponent<Renderer>();
+        if (signRend != null)
+        {
+            Material signMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            signMat.color = new Color(0.18f, 0.38f, 0.22f); // Matte dark green sign
+            signMat.DisableKeyword("_EMISSION");
+            signRend.sharedMaterial = signMat;
+        }
+
+        // NOTE: No green point light or glowing beacon is added! It is non-glowing.
+
+        return exitObj;
+    }
+
     static GameObject CreateBoxPart(Transform parent, string name, Vector3 localPos, Vector3 localScale, Material mat)
     {
         GameObject part = GameObject.CreatePrimitive(PrimitiveType.Cube);

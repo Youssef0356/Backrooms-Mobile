@@ -422,7 +422,7 @@ public static class VentAudio
     {
         get
         {
-            if (creak == null) creak = MakeCreak();
+            if (creak == null) creak = Resources.Load<AudioClip>("SFX/Vents/Vent_Creak") ?? MakeCreak();
             return creak;
         }
     }
@@ -431,7 +431,7 @@ public static class VentAudio
     {
         get
         {
-            if (thunk == null) thunk = MakeThunk();
+            if (thunk == null) thunk = Resources.Load<AudioClip>("SFX/Vents/Vent_Thunk") ?? MakeThunk();
             return thunk;
         }
     }

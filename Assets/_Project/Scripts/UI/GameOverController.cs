@@ -35,12 +35,16 @@ public class GameOverController : MonoBehaviour
     [Header("Audio")]
     [Tooltip("Sound played upon defeat. If null, picks a monster composition clip.")]
     [SerializeField] AudioClip defeatAudio;
+    [Tooltip("Iconic jumpscare scream played when killed by the Smily Hound / Dog (FNAF 2 full scream).")]
+    [SerializeField] AudioClip houndKillScream;
     [Range(0f, 1f)]
     [SerializeField] float defeatAudioVolume = 0.9f;
     [Tooltip("Fade-in duration in seconds for defeat audio.")]
     [SerializeField] float defeatFadeInDuration = 0.8f;
     [Tooltip("Fade-out duration in seconds for defeat audio.")]
     [SerializeField] float defeatFadeOutDuration = 2.2f;
+
+    private Transform activeKiller;
 
     [Header("Scene Navigation")]
     [SerializeField] string menuSceneName = "Menu";
@@ -127,6 +131,7 @@ public class GameOverController : MonoBehaviour
     {
         if (IsGameOver || VictoryController.IsGameWon) return;
         IsGameOver = true;
+        activeKiller = killer;
 
         timeSurvived = Time.timeSinceLevelLoad;
         if (AdManager.Instance != null)
@@ -182,44 +187,109 @@ public class GameOverController : MonoBehaviour
         CameraVHSGlitch.TriggerKillBurst();
 
         Transform killerHead = null;
+        SmilyMonsterGait houndGait = killer != null ? (killer.GetComponent<SmilyMonsterGait>() ?? killer.GetComponentInChildren<SmilyMonsterGait>()) : null;
+        SmilyHoundAI houndAI = killer != null ? (killer.GetComponent<SmilyHoundAI>() ?? killer.GetComponentInChildren<SmilyHoundAI>()) : null;
+        bool isHound = houndGait != null || houndAI != null || (killer != null && (killer.name.ToLower().Contains("hound") || killer.name.ToLower().Contains("dog")));
+
         if (killer != null && mainCam != null)
         {
-            killerHead = FindHeadBone(killer);
+            if (houndGait != null && houndGait.Head != null)
+            {
+                killerHead = houndGait.Head;
+            }
+            else
+            {
+                killerHead = FindHeadBone(killer);
+            }
 
-            // Nudge killer to stand directly in front of the camera (1.15m away) for maximum jumpscare impact
+            // Disable CharacterController on killer during death choreography so placement is exact
+            CharacterController killerCC = killer.GetComponent<CharacterController>();
+            if (killerCC != null) killerCC.enabled = false;
+
+            // Frame killer at exact choreography distance:
+            // - Bacteria (2.0x scale playing Zombie Neck Bite): 1.65m so its forward grab/bite lands directly on the camera without chest clipping
+            // - Smily Hound (authentic quadruped scale rearing up & mauling): 1.10m so its snarling jaws fill the frame cleanly
+            bool isBacteria = !isHound && killer.name.ToLowerInvariant().Contains("bacteria");
+            float standDist = isHound ? 1.10f : (isBacteria ? 1.65f : 1.25f);
+
+            Vector3 flatCamForward = new Vector3(cam.forward.x, 0f, cam.forward.z);
+            if (flatCamForward.sqrMagnitude < 0.01f) flatCamForward = Vector3.forward;
+            flatCamForward.Normalize();
+
             Vector3 toKiller = killer.position - cam.position;
             toKiller.y = 0f;
-            float currentDist = toKiller.magnitude;
-            if (currentDist > 1.35f || currentDist < 0.75f)
+            Vector3 placementDir = toKiller.sqrMagnitude > 0.04f ? toKiller.normalized : flatCamForward;
+
+            // Ensure placementDir does not place the killer inside or behind a 0.25m wall
+            int wallMask = LayerMask.GetMask("Default");
+            Vector3 chestOrigin = new Vector3(cam.position.x, killer.position.y + 0.9f, cam.position.z);
+            if (Physics.Raycast(chestOrigin, placementDir, out RaycastHit wallHit, standDist + 0.55f, wallMask, QueryTriggerInteraction.Ignore))
             {
-                Vector3 desiredPos = cam.position + (currentDist > 0.1f ? toKiller.normalized : cam.forward) * 1.15f;
-                desiredPos.y = killer.position.y;
-                if (UnityEngine.AI.NavMesh.SamplePosition(desiredPos, out UnityEngine.AI.NavMeshHit navHit, 1.6f, UnityEngine.AI.NavMesh.AllAreas))
+                // Find the clearest open direction around the player
+                float bestClearDist = wallHit.distance;
+                Vector3 bestDir = placementDir;
+                for (int i = 0; i < 8; i++)
                 {
-                    killer.position = navHit.position;
+                    float angle = i * 45f;
+                    Vector3 testDir = Quaternion.Euler(0f, angle, 0f) * placementDir;
+                    if (!Physics.Raycast(chestOrigin, testDir, out RaycastHit th, standDist + 0.55f, wallMask, QueryTriggerInteraction.Ignore))
+                    {
+                        bestDir = testDir;
+                        bestClearDist = standDist + 0.55f;
+                        break;
+                    }
+                    else if (th.distance > bestClearDist)
+                    {
+                        bestClearDist = th.distance;
+                        bestDir = testDir;
+                    }
                 }
+                placementDir = bestDir;
+                standDist = Mathf.Min(standDist, Mathf.Max(0.95f, bestClearDist - 0.45f));
             }
+
+            Vector3 desiredPos = cam.position + placementDir * standDist;
+            desiredPos.y = killer.position.y;
+            killer.position = desiredPos;
 
             // Orient killer directly toward the player camera
             Vector3 toCam = cam.position - killer.position;
             toCam.y = 0f;
             if (toCam.sqrMagnitude > 0.01f)
             {
-                killer.rotation = Quaternion.LookRotation(toCam);
+                killer.rotation = Quaternion.LookRotation(toCam.normalized);
             }
 
-            // Immediately launch the attack animation right at the camera
+            // Trigger dedicated visceral kill animation
+            if (houndGait != null)
+            {
+                houndGait.TriggerKillJumpscare(cam);
+            }
+
             Animator anim = killer.GetComponentInChildren<Animator>();
             if (anim != null)
             {
                 anim.speed = 1f;
-                anim.Play("Attack 1", 0, 0f);
+                if (isHound)
+                {
+                    if (anim.HasState(0, Animator.StringToHash("Attack")))
+                        anim.Play("Attack", 0, 0f);
+                }
+                else
+                {
+                    if (anim.HasState(0, Animator.StringToHash("Attack 1")))
+                        anim.Play("Attack 1", 0, 0f);
+                    else if (anim.HasState(0, Animator.StringToHash("Zombie Neck Bite")))
+                        anim.Play("Zombie Neck Bite", 0, 0f);
+                }
             }
         }
 
         Vector3 startCamPos = cam != null ? cam.position : Vector3.zero;
-        float totalDuration = Mathf.Max(caughtDelay, 2.4f);
-        float impactTime = 0.52f; // Time when monster's strike connects with player's face
+        bool isBacteriaKill = !isHound && killer != null && killer.name.ToLowerInvariant().Contains("bacteria");
+        float totalDuration = Mathf.Max(caughtDelay, 2.45f);
+        float impactTime = isHound ? 0.48f : (isBacteriaKill ? 0.78f : 0.52f);
+        float collapseStartTime = isHound ? 0.65f : (isBacteriaKill ? 1.45f : 0.65f);
         bool impactTriggered = false;
 
         float timer = 0f;
@@ -231,46 +301,56 @@ public class GameOverController : MonoBehaviour
                 float dt = Time.unscaledDeltaTime;
                 timer += dt;
 
-                Vector3 facePos = killerHead != null ? killerHead.position : (killer.position + Vector3.up * 1.55f);
+                Vector3 facePos = killerHead != null
+                    ? killerHead.position
+                    : (killer.position + Vector3.up * (isHound ? 1.15f : (isBacteriaKill ? 2.15f : 1.55f)));
+
+                // Safety guarantee: if a mesh/bone ever reports a low Y for 2.0x Bacteria, keep focus on its face level
+                if (isBacteriaKill && facePos.y < killer.position.y + 1.55f)
+                {
+                    facePos.y = killer.position.y + 2.15f;
+                }
 
                 if (timer < impactTime)
                 {
                     // =========================================================================
-                    // PHASE 1: Jumpscare Snap into Monster's Face + Looming Dread Tremor
+                    // PHASE 1: Grappled / Cornered — Camera Immediately Locks Onto Monster's Face
                     // =========================================================================
                     float phaseProgress = Mathf.Clamp01(timer / impactTime);
 
-                    // Whip-pan rotation directly into Clark's face/eyes
                     if (lookAtKiller)
                     {
                         Vector3 lookDir = (facePos - cam.position).normalized;
                         if (lookDir.sqrMagnitude > 0.01f)
                         {
                             Quaternion targetRot = Quaternion.LookRotation(lookDir);
-                            cam.rotation = Quaternion.Slerp(cam.rotation, targetRot, dt * cameraTurnSpeed * 1.6f);
+                            // Rapidly whip camera straight onto the monster's face so player sees the attack clearly
+                            cam.rotation = Quaternion.Slerp(cam.rotation, targetRot, dt * Mathf.Max(cameraTurnSpeed, 14f) * 2.5f);
                         }
                     }
 
-                    // Smooth dolly in toward the face
-                    Vector3 forwardDir = (facePos - cam.position).normalized;
-                    Vector3 dollyTarget = facePos - forwardDir * 0.95f;
-                    cam.position = Vector3.MoveTowards(cam.position, dollyTarget, dt * 2.2f);
+                    // For Bacteria (Zombie Neck Bite), lift camera slightly to 1.82m as it grabs the player's shoulders/neck
+                    // For Hound, hold eye level at 0.92m in front of its rearing jaws
+                    Vector3 targetCamPos = startCamPos;
+                    if (isBacteriaKill)
+                    {
+                        targetCamPos = new Vector3(startCamPos.x, Mathf.Lerp(startCamPos.y, killer.position.y + 1.82f, phaseProgress), startCamPos.z);
+                    }
 
-                    // High-frequency fear shivering tremor
-                    float shiver = (1f - phaseProgress) * 0.025f;
-                    Vector3 tremor = (Mathf.Sin(timer * 55f) * cam.right + Mathf.Cos(timer * 65f) * cam.up) * shiver;
-                    cam.position += tremor;
+                    float shiver = (1f - phaseProgress * 0.5f) * 0.022f;
+                    Vector3 tremor = (Mathf.Sin(timer * 58f) * cam.right + Mathf.Cos(timer * 68f) * cam.up) * shiver;
+                    cam.position = Vector3.Lerp(cam.position, targetCamPos, dt * 10f) + tremor;
                 }
                 else
                 {
                     // =========================================================================
-                    // PHASE 2 & 3: LETHAL STRIKE IMPACT & VIOLENT SCREEN SHAKE & FLOOR COLLAPSE
+                    // PHASE 2 & 3: LETHAL NECK BITE / MAUL IMPACT -> FLOOR COLLAPSE
                     // =========================================================================
                     if (!impactTriggered)
                     {
                         impactTriggered = true;
+                        CameraVHSGlitch.TriggerKillBurst();
 
-                        // Play impact thud
                         AudioClip landClip = Resources.Load<AudioClip>("SFX/Footsteps/Player_Land");
                         if (landClip != null && audioSource != null)
                         {
@@ -279,34 +359,33 @@ public class GameOverController : MonoBehaviour
                     }
 
                     float timeSinceImpact = timer - impactTime;
+                    float trauma = Mathf.Clamp01(1f - (timeSinceImpact / 0.75f));
+                    trauma = trauma * trauma;
 
-                    // Violent screen shake trauma that decays smoothly over 0.65s
-                    float trauma = Mathf.Clamp01(1f - (timeSinceImpact / 0.65f));
-                    trauma = trauma * trauma; // exponential decay
+                    float shakeYaw = Mathf.Sin(timer * 42f) * 18f * trauma;
+                    float shakePitch = (Mathf.Cos(timer * 48f) * 14f - 12f) * trauma;
+                    float shakeRoll = Mathf.Sin(timer * 36f) * 24f * trauma;
 
-                    // High-intensity rotational jolt (pitch head whip-back, roll tilt, yaw recoil)
-                    float shakeYaw = Mathf.Sin(timer * 38f) * 16f * trauma;
-                    float shakePitch = (Mathf.Cos(timer * 44f) * 12f - 14f) * trauma; // recoil back
-                    float shakeRoll = Mathf.Sin(timer * 32f) * 22f * trauma;
+                    float collapseProgress = timer < collapseStartTime
+                        ? 0f
+                        : Mathf.Clamp01((timer - collapseStartTime) / 0.85f);
 
-                    // Player body collapse towards carpet floor
-                    float collapseProgress = Mathf.Clamp01((timeSinceImpact - 0.15f) / 1.1f);
-                    float floorY = Mathf.Max(startCamPos.y - 1.32f, 0.22f);
-                    float currentY = Mathf.Lerp(cam.position.y, floorY, collapseProgress);
+                    float heldY = isBacteriaKill ? (killer.position.y + 1.75f) : startCamPos.y;
+                    float floorY = Mathf.Max(killer.position.y + 0.24f, 0.22f);
+                    float currentY = Mathf.Lerp(heldY, floorY, Mathf.SmoothStep(0f, 1f, collapseProgress));
 
-                    // Dutch angle as the player's head rests on the floor
-                    float deathRoll = Mathf.Lerp(0f, 68f, collapseProgress);
-                    float deathPitch = Mathf.Lerp(0f, 25f, collapseProgress);
+                    float deathRoll = Mathf.Lerp(0f, 64f, collapseProgress);
+                    float deathPitch = Mathf.Lerp(0f, 20f, collapseProgress);
 
                     Vector3 lookDir = (facePos - cam.position).normalized;
+                    if (lookDir.sqrMagnitude < 0.01f) lookDir = cam.forward;
                     Quaternion baseRot = Quaternion.LookRotation(lookDir);
                     Quaternion shakeRot = Quaternion.Euler(shakePitch + deathPitch, shakeYaw, shakeRoll + deathRoll);
 
-                    cam.rotation = Quaternion.Slerp(cam.rotation, baseRot * shakeRot, dt * 14f);
+                    cam.rotation = Quaternion.Slerp(cam.rotation, baseRot * shakeRot, dt * 16f);
 
-                    // Positional shake impulse
-                    Vector3 shakePos = (cam.right * Mathf.Sin(timer * 40f) + cam.up * Mathf.Cos(timer * 50f)) * (0.065f * trauma);
-                    cam.position = new Vector3(cam.position.x, currentY, cam.position.z) + shakePos;
+                    Vector3 shakePos = (cam.right * Mathf.Sin(timer * 44f) + cam.up * Mathf.Cos(timer * 54f)) * (0.06f * trauma);
+                    cam.position = new Vector3(startCamPos.x, currentY, startCamPos.z) + shakePos;
                 }
 
                 yield return null;
@@ -323,7 +402,15 @@ public class GameOverController : MonoBehaviour
     Transform FindHeadBone(Transform root)
     {
         if (root == null) return null;
-        return FindChildRecursive(root, "head", "neck", "spine_03", "spine.003", "spine_02");
+
+        Animator anim = root.GetComponentInChildren<Animator>();
+        if (anim != null && anim.isHuman)
+        {
+            Transform humanHead = anim.GetBoneTransform(HumanBodyBones.Head);
+            if (humanHead != null) return humanHead;
+        }
+
+        return FindChildRecursive(root, "mixamorig:head", "head_05", "head", "neck");
     }
 
     Transform FindChildRecursive(Transform parent, params string[] names)
@@ -331,10 +418,14 @@ public class GameOverController : MonoBehaviour
         for (int i = 0; i < parent.childCount; i++)
         {
             Transform child = parent.GetChild(i);
-            string lowerName = child.name.ToLowerInvariant();
-            foreach (string n in names)
+            // Ignore SkinnedMeshRenderer / MeshRenderer child objects (like Bacteria's 'CableHead' or 'Head' mesh at y=0)
+            if (child.GetComponent<Renderer>() == null)
             {
-                if (lowerName.Contains(n)) return child;
+                string lowerName = child.name.ToLowerInvariant();
+                foreach (string n in names)
+                {
+                    if (lowerName.Contains(n)) return child;
+                }
             }
             Transform found = FindChildRecursive(child, names);
             if (found != null) return found;
@@ -543,7 +634,26 @@ public class GameOverController : MonoBehaviour
 
     void PlayDefeatAudio()
     {
-        AudioClip clip = defeatAudio;
+        AudioClip clip = null;
+        bool isHoundKill = false;
+
+        // Check if killed by Hound / Dog
+        if (activeKiller != null)
+        {
+            string killerName = activeKiller.name.ToLower();
+            if (activeKiller.GetComponent<SmilyHoundAI>() != null ||
+                activeKiller.GetComponentInChildren<SmilyHoundAI>() != null ||
+                activeKiller.GetComponent<SmilyMonsterGait>() != null ||
+                activeKiller.GetComponentInChildren<SmilyMonsterGait>() != null ||
+                killerName.Contains("hound") || killerName.Contains("dog") || killerName.Contains("smily"))
+            {
+                isHoundKill = true;
+                clip = HoundAudio.KillScream;
+            }
+        }
+
+        if (clip == null)
+            clip = defeatAudio;
         if (clip == null)
             clip = MonsterCompositionAudio.GetRandomCompositionClip();
         if (clip == null)
@@ -551,31 +661,35 @@ public class GameOverController : MonoBehaviour
 
         if (clip != null && audioSource != null)
         {
-            StartCoroutine(FadeDefeatAudioRoutine(clip));
+            StartCoroutine(FadeDefeatAudioRoutine(clip, isHoundKill));
         }
     }
 
-    IEnumerator FadeDefeatAudioRoutine(AudioClip clip)
+    IEnumerator FadeDefeatAudioRoutine(AudioClip clip, bool isInstantScream = false)
     {
         audioSource.clip = clip;
         audioSource.ignoreListenerPause = true;
-        audioSource.volume = 0f;
-        audioSource.Play();
 
-        float targetVolume = defeatAudioVolume * GameSettings.MasterVolume;
+        float targetVolume = (isInstantScream ? 1.0f : defeatAudioVolume) * GameSettings.MasterVolume;
         float clipDuration = clip.length;
 
-        float fadeIn = Mathf.Min(defeatFadeInDuration, clipDuration * 0.3f);
-        float fadeOut = Mathf.Min(defeatFadeOutDuration, clipDuration * 0.45f);
+        float fadeIn = isInstantScream ? 0f : Mathf.Min(defeatFadeInDuration, clipDuration * 0.3f);
+        float fadeOut = isInstantScream ? 0.3f : Mathf.Min(defeatFadeOutDuration, clipDuration * 0.45f);
         float sustain = Mathf.Max(0f, clipDuration - fadeIn - fadeOut);
 
+        audioSource.volume = isInstantScream ? targetVolume : 0f;
+        audioSource.Play();
+
         // 1. Fade in
-        float timer = 0f;
-        while (timer < fadeIn)
+        if (fadeIn > 0.01f)
         {
-            timer += Time.unscaledDeltaTime;
-            audioSource.volume = Mathf.Lerp(0f, targetVolume, Mathf.Clamp01(timer / fadeIn));
-            yield return null;
+            float timer = 0f;
+            while (timer < fadeIn)
+            {
+                timer += Time.unscaledDeltaTime;
+                audioSource.volume = Mathf.Lerp(0f, targetVolume, Mathf.Clamp01(timer / fadeIn));
+                yield return null;
+            }
         }
         audioSource.volume = targetVolume;
 
@@ -586,11 +700,11 @@ public class GameOverController : MonoBehaviour
         }
 
         // 3. Fade out
-        timer = 0f;
-        while (timer < fadeOut)
+        float outTimer = 0f;
+        while (outTimer < fadeOut)
         {
-            timer += Time.unscaledDeltaTime;
-            audioSource.volume = Mathf.Lerp(targetVolume, 0f, Mathf.Clamp01(timer / fadeOut));
+            outTimer += Time.unscaledDeltaTime;
+            audioSource.volume = Mathf.Lerp(targetVolume, 0f, Mathf.Clamp01(outTimer / fadeOut));
             yield return null;
         }
 

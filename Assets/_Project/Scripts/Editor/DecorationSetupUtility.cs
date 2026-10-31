@@ -7,12 +7,7 @@ public static class DecorationSetupUtility
 {
     const string DecorationFolder = "Assets/_Project/Art/Environment/Backrooms/Decoration";
 
-    static DecorationSetupUtility()
-    {
-        EditorApplication.delayCall += InspectAndFixPrefabs;
-    }
-
-    [MenuItem("Tools/Backrooms/Inspect and Fix Decoration Prefabs")]
+    [MenuItem("Tools/Backrooms/Maintenance/Inspect and Fix Decoration Prefabs")]
     public static void InspectAndFixPrefabs()
     {
         string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { DecorationFolder });

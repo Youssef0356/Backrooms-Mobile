@@ -37,7 +37,7 @@ public static class SmilyMonsterSetup
         };
     }
 
-    [MenuItem("Backrooms/Smily Monster/1. Build 4-Legged Gallop & Controller")]
+    [MenuItem("Tools/Backrooms/Entities/Smily Monster/1. Build Gallop & Controller")]
     public static void BuildAnimatorAndClips()
     {
         // 1. Bake 4-Legged Gallop Animation Clip
@@ -60,7 +60,7 @@ public static class SmilyMonsterSetup
         AssetDatabase.Refresh();
     }
 
-    [MenuItem("Backrooms/Smily Monster/Set Up Smily Hound as Exit Portal Guardian")]
+    [MenuItem("Tools/Backrooms/Entities/Smily Monster/3. Set Up Hound at Exit Portal")]
     public static void SetUpHoundAtExitMenu()
     {
         BuildAnimatorAndClips();
@@ -77,14 +77,14 @@ public static class SmilyMonsterSetup
         // 1. Root GameObject (carries AI, NavMeshAgent, Audio, Gait)
         GameObject rootGo = new GameObject("SmilyHorrorHound");
 
-        // 2. Visual Model Child (normalizes scale from 100m down to 0.85m, flips 180 to face forward, and centers X offset)
+        // 2. Visual Model Child (normalizes scale from 100m down to 0.85m, aligned with origin facing forward +Z)
         GameObject visualChild = (GameObject)PrefabUtility.InstantiatePrefab(modelPrefab);
         visualChild.name = "VisualModel";
         visualChild.transform.SetParent(rootGo.transform, false);
 
-        const float modelScale = 0.013f;
-        visualChild.transform.localPosition = new Vector3(75.089f * modelScale, -10f * modelScale, -10f * modelScale);
-        visualChild.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        const float modelScale = 0.013f; // Authentic Inside the Backrooms crawling quadruped proportion (~0.95m tall)
+        visualChild.transform.localPosition = new Vector3(-0.98f, 0f, -0.18f);
+        visualChild.transform.localRotation = Quaternion.identity;
         visualChild.transform.localScale = new Vector3(modelScale, modelScale, modelScale);
 
         // 3. Animator on visualChild so relative clip paths match
@@ -97,22 +97,33 @@ public static class SmilyMonsterSetup
 
         // 4. NavMeshAgent on rootGo
         NavMeshAgent agent = rootGo.AddComponent<NavMeshAgent>();
-        agent.radius = 0.45f;
+        agent.radius = 0.42f;
         agent.height = 0.90f;
         agent.speed = 4.4f;
-        agent.acceleration = 14f;
-        agent.angularSpeed = 500f;
-        agent.stoppingDistance = 1.2f;
+        agent.acceleration = 24f;
+        agent.angularSpeed = 720f;
+        agent.stoppingDistance = 1.1f;
+        agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
+        agent.avoidancePriority = 35;
+
+        // CapsuleCollider for hitboxes and raycasts
+        CapsuleCollider col = rootGo.AddComponent<CapsuleCollider>();
+        col.radius = 0.42f;
+        col.height = 0.85f;
+        col.center = new Vector3(0f, 0.425f, 0f);
+        col.direction = 1;
 
         // 5. SmilyMonsterGait (Procedural 4-Legged Runner)
         SmilyMonsterGait gait = rootGo.AddComponent<SmilyMonsterGait>();
         gait.maxSpeed = 4.4f;
 
-        // 6. SmilyHoundAI (Smart Territorial AI)
+        // 6. SmilyHoundAI (Exit Portal Guardian)
         SmilyHoundAI ai = rootGo.AddComponent<SmilyHoundAI>();
-        ai.territoryRadius = 22f;
-        ai.leashMaxDistance = 32f;
-        ai.chaseSpeed = 4.5f;
+        ai.territoryRadius = 24f;
+        ai.leashMaxDistance = 34f;
+        ai.wanderRadius = 14f;
+        ai.waitAtPoint = 2.0f;
+        ai.chaseSpeed = 4.4f;
 
         // 7. AudioSource
         AudioSource audio = rootGo.AddComponent<AudioSource>();
@@ -157,7 +168,7 @@ public static class SmilyMonsterSetup
         Debug.Log($"[SmilyMonster] Created Normalized Smart Hound Prefab: {houndPrefabPath}");
     }
 
-    [MenuItem("Backrooms/Smily Monster/2. Set Up Smily Monster as Level Villain")]
+    [MenuItem("Tools/Backrooms/Entities/Smily Monster/2. Set Up Monster as Level Villain")]
     public static void SetUpVillainMenu()
     {
         BuildAnimatorAndClips();

@@ -17,7 +17,7 @@ public static class MobileAudioImportUtility
     };
     const float StreamingLengthSeconds = 60f;   // clips at least this long stream from disk
 
-    [MenuItem("Tools/Backrooms/Fix SFX Import Settings (Mobile)")]
+    [MenuItem("Tools/Backrooms/Build & Mobile/Fix SFX Import Settings (Mobile)")]
     public static void ApplyMobileSettings()
     {
         string[] guids = AssetDatabase.FindAssets("t:AudioClip", AudioFolders);

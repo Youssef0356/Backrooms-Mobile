@@ -38,6 +38,8 @@ public class BackroomsBlackoutEvent : MonoBehaviour
     Color originalEmissionColor = new Color(2.4f, 2.3f, 2.0f);
     AudioSource audioSource;
     Coroutine eventRoutine;
+    Dictionary<Light, float> baseLightIntensities = new Dictionary<Light, float>();
+    float nextCacheTime = 0f;
 
     void Start()
     {
@@ -57,6 +59,56 @@ public class BackroomsBlackoutEvent : MonoBehaviour
         }
 
         eventRoutine = StartCoroutine(BlackoutCycleRoutine());
+    }
+
+    void Update()
+    {
+        if (IsBlackoutActive || PauseMenuController.IsPaused || GameOverController.IsGameOver) return;
+
+        if (Time.time >= nextCacheTime)
+        {
+            nextCacheTime = Time.time + 4.0f;
+            if (panelLights.Count == 0) CachePanelLights();
+        }
+
+        // Phase 6: Inside the Backrooms Monster Proximity Electromagnetic Flicker
+        // When Bacteria approaches within 15m of ceiling fixtures, nearby lights stutter and dim
+        Transform monster = VillainAI.Instance != null ? VillainAI.Instance.transform : null;
+        if (monster == null || !monster.gameObject.activeInHierarchy) return;
+
+        Vector3 mPos = monster.position;
+        bool isChasing = VillainAI.Instance.CurrentState == VillainAI.State.Chase;
+        float radius = isChasing ? 16f : 12f;
+        float radiusSq = radius * radius;
+
+        for (int i = 0; i < panelLights.Count; i++)
+        {
+            Light l = panelLights[i];
+            if (l == null) continue;
+            if (!baseLightIntensities.TryGetValue(l, out float baseInt))
+            {
+                baseInt = l.intensity > 0.1f ? l.intensity : 1.15f;
+                baseLightIntensities[l] = baseInt;
+            }
+
+            float dSq = (l.transform.position - mPos).sqrMagnitude;
+            if (dSq < radiusSq)
+            {
+                float n = Mathf.PerlinNoise(Time.time * (isChasing ? 24f : 14f), i * 3.17f);
+                if (n < (isChasing ? 0.42f : 0.28f))
+                {
+                    l.intensity = baseInt * Random.Range(0.05f, 0.35f);
+                }
+                else
+                {
+                    l.intensity = baseInt;
+                }
+            }
+            else if (l.intensity != baseInt)
+            {
+                l.intensity = Mathf.MoveTowards(l.intensity, baseInt, Time.deltaTime * 3f);
+            }
+        }
     }
 
     void OnDestroy()
@@ -179,6 +231,12 @@ public class BackroomsBlackoutEvent : MonoBehaviour
         for (int i = 0; i < panelLights.Count; i++)
         {
             if (panelLights[i] != null) panelLights[i].enabled = on;
+        }
+
+        var allFixtures = BackroomsFluorescentLight.AllFixtures;
+        for (int i = 0; i < allFixtures.Count; i++)
+        {
+            if (allFixtures[i] != null) allFixtures[i].SetBlackout(!on);
         }
     }
 

@@ -54,7 +54,7 @@ public static class AlmondWaterMeshBuilder
             new Vector2(0.000f, 0.255f)  // Cap top center
         };
 
-        // Build main bottle lathe
+        // Build main bottle lathe (+Z is front, +Y is top)
         for (int p = 0; p < profile.Length; p++)
         {
             float r = profile[p].x;
@@ -62,13 +62,15 @@ public static class AlmondWaterMeshBuilder
 
             for (int s = 0; s <= radialSegments; s++)
             {
-                float angle = (float)s / radialSegments * Mathf.PI * 2f;
-                float x = Mathf.Cos(angle) * r;
-                float z = Mathf.Sin(angle) * r;
+                // Align so that u = 0.5 (center of the front label) faces exactly along local +Z (forward)
+                float u = (float)s / radialSegments;
+                float angle = (u - 0.5f) * Mathf.PI * 2f;
+                float x = Mathf.Sin(angle) * r;
+                float z = Mathf.Cos(angle) * r;
 
                 vertices.Add(new Vector3(x, y, z));
-                normals.Add(r > 0.001f ? new Vector3(Mathf.Cos(angle), 0.15f, Mathf.Sin(angle)).normalized : Vector3.up);
-                uvs.Add(new Vector2((float)s / radialSegments, y / 0.26f));
+                normals.Add(r > 0.001f ? new Vector3(Mathf.Sin(angle), 0.15f, Mathf.Cos(angle)).normalized : Vector3.up);
+                uvs.Add(new Vector2(u, y / 0.26f));
             }
         }
 
@@ -104,19 +106,20 @@ public static class AlmondWaterMeshBuilder
 
         for (int s = 0; s <= radialSegments; s++)
         {
-            float angle = (float)s / radialSegments * Mathf.PI * 2f;
-            float x = Mathf.Cos(angle);
-            float z = Mathf.Sin(angle);
+            float u = (float)s / radialSegments;
+            float angle = (u - 0.5f) * Mathf.PI * 2f;
+            float x = Mathf.Sin(angle);
+            float z = Mathf.Cos(angle);
 
             // Bottom edge of label
             vertices.Add(new Vector3(x * labelR, labelY0, z * labelR));
             normals.Add(new Vector3(x, 0f, z));
-            uvs.Add(new Vector2((float)s / radialSegments, 0f));
+            uvs.Add(new Vector2(u, 0f));
 
             // Top edge of label
             vertices.Add(new Vector3(x * labelR, labelY1, z * labelR));
             normals.Add(new Vector3(x, 0f, z));
-            uvs.Add(new Vector2((float)s / radialSegments, 1f));
+            uvs.Add(new Vector2(u, 1f));
         }
 
         for (int s = 0; s < radialSegments; s++)

@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -14,7 +15,7 @@ public static class MenuSceneSetup
     const string MenuScenePath = "Assets/_Project/Scenes/Menu.unity";
     const string PanelSettingsPath = "Assets/_Project/UI/Menu Panel Settings.asset";
 
-    [MenuItem("Tools/Backrooms/Setup Main Menu Scene")]
+    [MenuItem("Tools/Backrooms/Scene Setup/Main Menu/Setup Main Menu Scene")]
     public static void SetupMenuScene()
     {
         Scene scene = SceneManager.GetActiveScene();
@@ -94,12 +95,58 @@ public static class MenuSceneSetup
         EditorSceneManager.SaveScene(scene);
 
         AddSceneToBuildSettings();
+        SetupMenuClarkAnimation();
 
         Debug.Log("[Backrooms] Main menu scene is ready. " + PanelSettingsPath + " is used as the world space panel.");
     }
 
+    [MenuItem("Tools/Backrooms/Scene Setup/Main Menu/Setup Menu Clark Idle Animation")]
+    public static void SetupMenuClarkAnimation()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        if (scene.path != MenuScenePath)
+            scene = EditorSceneManager.OpenScene(MenuScenePath, OpenSceneMode.Single);
+
+        // Find Clark in the Menu scene
+        GameObject clark = GameObject.Find("Pirate clark norpa");
+        if (clark == null)
+        {
+            var allGo = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            clark = allGo.FirstOrDefault(go => go != null && go.name.ToLowerInvariant().Contains("clark"));
+        }
+
+        if (clark == null)
+        {
+            Debug.LogWarning("[MenuSceneSetup] Could not find Pirate Clark in Menu scene!");
+            return;
+        }
+
+        RuntimeAnimatorController controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/_Project/Art/Characters/Clark/ClarkVillain.controller");
+        Avatar avatar = AssetDatabase.LoadAllAssetsAtPath("Assets/_Project/Art/Characters/Clark/Pirate clark norpa.glb").OfType<Avatar>().FirstOrDefault();
+
+        Animator animator = clark.GetComponent<Animator>();
+        if (animator == null)
+        {
+            animator = Undo.AddComponent<Animator>(clark);
+        }
+
+        Undo.RecordObject(animator, "Configure Menu Clark Animator");
+        animator.runtimeAnimatorController = controller;
+        if (avatar != null) animator.avatar = avatar;
+        animator.applyRootMotion = false;
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        animator.enabled = true;
+
+        EditorUtility.SetDirty(animator);
+        EditorUtility.SetDirty(clark);
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log("<color=#00FF88><b>[Menu Clark]</b></color> Successfully configured Pirate Clark in Menu scene! Idle animation is now active.");
+    }
+
     /// <summary>Makes sure the menu is the first scene of the build.</summary>
-    [MenuItem("Tools/Backrooms/Add Menu To Build Settings")]
+    [MenuItem("Tools/Backrooms/Scene Setup/Main Menu/Add Menu To Build Settings")]
     public static void AddSceneToBuildSettings()
     {
         var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);

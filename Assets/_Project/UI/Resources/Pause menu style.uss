@@ -317,7 +317,7 @@
 .guide-fab {
     position: absolute;
     top: 18px;
-    right: 84px;
+    right: 86px;
     width: 56px;
     height: 56px;
     align-items: center;

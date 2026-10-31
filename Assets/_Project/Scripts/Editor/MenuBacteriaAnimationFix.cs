@@ -34,7 +34,7 @@ public static class MenuBacteriaAnimationFix
     const string EnvironmentObjectPrefix = "backrooms_vr";
     const string BacteriaRootName = "Bacteria@Walking";
 
-    [MenuItem("Backrooms/Fix Menu Bacteria Animation")]
+    [MenuItem("Tools/Backrooms/Scene Setup/Main Menu/Fix Menu Bacteria Animation")]
     public static void Fix()
     {
         if (SceneManager.GetActiveScene().path != MenuScenePath)

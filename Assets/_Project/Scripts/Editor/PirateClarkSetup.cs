@@ -30,6 +30,8 @@ public static class PirateClarkSetup
     const string ControllerPath = "Assets/_Project/Art/Characters/Clark/ClarkVillain.controller";
     const string VillainNameFragment = "clark";
 
+    // AutoSetup disabled so it does not override Bacteria villain setup
+    /*
     [InitializeOnLoadMethod]
     private static void AutoSetup()
     {
@@ -39,8 +41,9 @@ public static class PirateClarkSetup
             SetUpVillainMenu();
         };
     }
+    */
 
-    [MenuItem("Backrooms/Pirate Clark/Build Clark Animator")]
+    [MenuItem("Tools/Backrooms/Entities/Pirate Clark/Build Clark Animator")]
     public static void BuildAnimatorMenu()
     {
         AnimatorController controller = BuildController();
@@ -48,49 +51,60 @@ public static class PirateClarkSetup
             Debug.Log($"[Clark] Built {ControllerPath} ({controller.layers[0].stateMachine.states.Length} states).");
     }
 
-    [MenuItem("Backrooms/Pirate Clark/Set Up Clark Villain")]
+    [MenuItem("Tools/Backrooms/Entities/Pirate Clark/Set Up Clark Villain")]
     public static void SetUpVillainMenu()
     {
         AnimatorController controller = BuildController();
         if (controller == null) return;
 
+        GameObject clarkObj = null;
         VillainAI villain = Object.FindObjectsByType<VillainAI>(FindObjectsInactive.Include)
             .FirstOrDefault(v => v != null && v.gameObject.name.ToLowerInvariant().Contains(VillainNameFragment));
 
-        if (villain == null)
+        if (villain != null)
         {
-            Debug.LogError("[Clark] No 'Pirate clark norpa' object with a VillainAI was found in the open scene. " +
-                           "Open MainLevel and try again.");
+            clarkObj = villain.gameObject;
+        }
+        else
+        {
+            // Look for any Clark in the active scene (e.g. Menu scene)
+            var allGo = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            clarkObj = allGo.FirstOrDefault(go => go != null && go.name.ToLowerInvariant().Contains(VillainNameFragment));
+        }
+
+        if (clarkObj == null)
+        {
+            Debug.LogError("[Clark] No 'Pirate clark norpa' object was found in the open scene.");
             return;
         }
 
         Avatar avatar = AssetDatabase.LoadAllAssetsAtPath(ModelPath).OfType<Avatar>().FirstOrDefault();
 
-        Animator animator = villain.GetComponent<Animator>();
+        Animator animator = clarkObj.GetComponent<Animator>();
         bool added = false;
         if (animator == null)
         {
-            animator = Undo.AddComponent<Animator>(villain.gameObject);
+            animator = Undo.AddComponent<Animator>(clarkObj);
             added = true;
         }
 
         animator.runtimeAnimatorController = controller;
         if (avatar != null) animator.avatar = avatar;
-        animator.applyRootMotion = false;                       // the clips are in place, the Agent moves him
-        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // he is part of the scare, never skip a frame
+        animator.applyRootMotion = false;                       // the clips are in place
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // never skip a frame
 
         // Fix model scale: the raw glTF is ~11m tall; 0.16 scale normalizes him to ~1.8m human height
-        villain.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
-        EditorUtility.SetDirty(villain.gameObject);
-        EditorUtility.SetDirty(villain.transform);
+        clarkObj.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
+        EditorUtility.SetDirty(clarkObj);
+        EditorUtility.SetDirty(clarkObj.transform);
         EditorUtility.SetDirty(animator);
 
-        string generatorReport = PointGeneratorAt(villain.gameObject);
+        string generatorReport = villain != null ? PointGeneratorAt(clarkObj) : "Menu scene background entity (Idle mode).";
 
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
         string avatarReport = animator.avatar != null ? $"Avatar '{animator.avatar.name}'" : "no Avatar (generic paths only)";
-        Debug.Log($"[Clark] {(added ? "Added" : "Refreshed")} Animator on '{villain.gameObject.name}' -> " +
+        Debug.Log($"[Clark] {(added ? "Added" : "Refreshed")} Animator on '{clarkObj.name}' -> " +
                   $"{controller.name}, {avatarReport}. {generatorReport} Save the scene (Ctrl+S) to keep it.");
     }
 

@@ -17,16 +17,22 @@ public class BackroomsDoor : MonoBehaviour
 
     [Header("Door Settings")]
     [Tooltip("Target swing angle when opened (degrees).")]
-    public float openAngle = 90f;
+    public float openAngle = 100f;
     [Tooltip("Duration in seconds for standard open swing.")]
-    public float openDuration = 0.55f;
+    public float openDuration = 0.50f;
     [Tooltip("Duration in seconds for standard close swing.")]
-    public float closeDuration = 0.65f;
+    public float closeDuration = 0.60f;
     [Tooltip("How many seconds the door stays open before automatically closing.")]
     public float autoCloseDelay = 4.5f;
 
+    [Header("Hierarchy & Custom Door Bindings")]
+    [Tooltip("Explicit hinge transform to rotate. If null, searches for HingePivot or Door.")]
+    public Transform customHingePivot;
+    [Tooltip("Explicit door leaf collider. If null, searches children.")]
+    public Collider customDoorCollider;
+
     [Header("Monster Interaction")]
-    [Tooltip("Radius within which a monster (VillainAI) triggers the door to swing open automatically.")]
+    [Tooltip("Radius within which a monster (VillainAI / AgathaAI) triggers the door to swing open automatically.")]
     public float monsterDetectRadius = 3.5f;
 
     [Header("Audio")]
@@ -39,6 +45,7 @@ public class BackroomsDoor : MonoBehaviour
     private Transform hingePivot;
     private BoxCollider doorLeafCollider;
     private AudioSource audioSource;
+    private Vector3 initialHingeEuler;
 
     private float autoCloseTimer;
     private Coroutine motionRoutine;
@@ -46,6 +53,48 @@ public class BackroomsDoor : MonoBehaviour
     private float currentAngle = 0f;
 
     private VillainAI cachedVillain;
+
+    private void Awake()
+    {
+        EnsureHingeBinding();
+    }
+
+    public void EnsureHingeBinding()
+    {
+        if (hingePivot == null)
+        {
+            if (customHingePivot != null) hingePivot = customHingePivot;
+            else
+            {
+                hingePivot = transform.Find("HingePivot") ??
+                             transform.Find("Animated Interior Door/Door") ??
+                             transform.Find("Door");
+            }
+
+            if (hingePivot != null)
+            {
+                initialHingeEuler = hingePivot.localEulerAngles;
+            }
+        }
+
+        if (doorLeafCollider == null)
+        {
+            doorLeafCollider = GetComponentInChildren<BoxCollider>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+                audioSource.playOnAwake = false;
+                audioSource.spatialBlend = 0.95f;
+                audioSource.minDistance = 2.0f;
+                audioSource.maxDistance = 18.0f;
+            }
+        }
+    }
 
     private void OnEnable()
     {
@@ -59,6 +108,7 @@ public class BackroomsDoor : MonoBehaviour
 
     private void Start()
     {
+        EnsureHingeBinding();
         cachedVillain = VillainAI.Instance;
     }
 
@@ -89,14 +139,52 @@ public class BackroomsDoor : MonoBehaviour
 
     private void CheckMonsterProximity()
     {
+        // 1. Check Agatha (Level 94 stalker)
+        if (AgathaAI.Instance != null && AgathaAI.Instance.isActiveAndEnabled)
+        {
+            float sqrDist = (AgathaAI.Instance.transform.position - transform.position).sqrMagnitude;
+            if (sqrDist <= monsterDetectRadius * monsterDetectRadius)
+            {
+                if (State == DoorState.Closed || State == DoorState.Closing)
+                {
+                    Open(autoClose: true, stayOpenTime: 5.0f);
+                }
+                else if (State == DoorState.Open)
+                {
+                    autoCloseTimer = Mathf.Max(autoCloseTimer, 3.0f);
+                }
+                return;
+            }
+        }
+
+        // 2. Check standard Backrooms villains (Clark / Bacteria / Agatha)
         if (cachedVillain == null)
         {
-            cachedVillain = VillainAI.Instance != null ? VillainAI.Instance : FindFirstObjectByType<VillainAI>();
+            cachedVillain = VillainAI.Instance != null ? VillainAI.Instance : FindAnyObjectByType<VillainAI>();
         }
+
+        // 3. Check Smily Hound (Dog guarding Exit Portal)
+        if (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.isActiveAndEnabled)
+        {
+            float sqrDistHound = (SmilyHoundAI.Instance.transform.position - transform.position).sqrMagnitude;
+            if (sqrDistHound <= monsterDetectRadius * monsterDetectRadius)
+            {
+                if (State == DoorState.Closed || State == DoorState.Closing)
+                {
+                    Open(autoClose: true, stayOpenTime: 5.0f);
+                }
+                else if (State == DoorState.Open)
+                {
+                    autoCloseTimer = Mathf.Max(autoCloseTimer, 3.0f);
+                }
+                return;
+            }
+        }
+
         if (cachedVillain == null || !cachedVillain.isActiveAndEnabled) return;
 
-        float sqrDist = (cachedVillain.transform.position - transform.position).sqrMagnitude;
-        if (sqrDist <= monsterDetectRadius * monsterDetectRadius)
+        float sqrDistVillain = (cachedVillain.transform.position - transform.position).sqrMagnitude;
+        if (sqrDistVillain <= monsterDetectRadius * monsterDetectRadius)
         {
             if (State == DoorState.Closed || State == DoorState.Closing)
             {
@@ -112,9 +200,25 @@ public class BackroomsDoor : MonoBehaviour
 
     private bool IsMonsterInThreshold()
     {
-        if (cachedVillain == null) return false;
-        float sqrDist = (cachedVillain.transform.position - transform.position).sqrMagnitude;
-        return sqrDist <= (monsterDetectRadius * 0.85f) * (monsterDetectRadius * 0.85f);
+        if (AgathaAI.Instance != null && AgathaAI.Instance.isActiveAndEnabled)
+        {
+            float sqrDist = (AgathaAI.Instance.transform.position - transform.position).sqrMagnitude;
+            if (sqrDist <= (monsterDetectRadius * 0.85f) * (monsterDetectRadius * 0.85f)) return true;
+        }
+
+        if (cachedVillain != null && cachedVillain.isActiveAndEnabled)
+        {
+            float sqrDist = (cachedVillain.transform.position - transform.position).sqrMagnitude;
+            if (sqrDist <= (monsterDetectRadius * 0.85f) * (monsterDetectRadius * 0.85f)) return true;
+        }
+
+        if (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.isActiveAndEnabled)
+        {
+            float sqrDistHound = (SmilyHoundAI.Instance.transform.position - transform.position).sqrMagnitude;
+            if (sqrDistHound <= (monsterDetectRadius * 0.85f) * (monsterDetectRadius * 0.85f)) return true;
+        }
+
+        return false;
     }
 
     // =========================================================================
@@ -260,7 +364,7 @@ public class BackroomsDoor : MonoBehaviour
     {
         if (hingePivot != null)
         {
-            hingePivot.localRotation = Quaternion.Euler(0f, angle, 0f);
+            hingePivot.localRotation = Quaternion.Euler(initialHingeEuler.x, initialHingeEuler.y + angle, initialHingeEuler.z);
         }
     }
 
@@ -298,10 +402,11 @@ public class BackroomsDoor : MonoBehaviour
         root.transform.rotation = Quaternion.LookRotation(forwardDir, Vector3.up);
 
         BackroomsDoor door = root.AddComponent<BackroomsDoor>();
-        door.Build(width, height,
-                   woodMat != null ? woodMat : DoorMaterials.DoorWood,
-                   frameMat != null ? frameMat : DoorMaterials.DoorFrame,
-                   handleMat != null ? handleMat : DoorMaterials.DoorHandle);
+        Material finalWood = woodMat != null ? woodMat : DoorMaterials.DoorWood;
+        Material finalFrame = frameMat != null ? frameMat : DoorMaterials.DoorFrame;
+        Material finalHandle = handleMat != null ? handleMat : DoorMaterials.DoorHandle;
+
+        door.Build(width, height, finalWood, finalFrame, finalHandle);
 
         return door;
     }

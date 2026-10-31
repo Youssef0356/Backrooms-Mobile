@@ -8,7 +8,7 @@ public static class GameSetupHelper
 {
     const string MainLevelScenePath = "Assets/_Project/Scenes/MainLevel.unity";
 
-    [MenuItem("Tools/Backrooms/Setup GameOver Controller in MainLevel")]
+    [MenuItem("Tools/Backrooms/Scene Setup/MainLevel (Level 0)/Setup GameOver Controller in MainLevel")]
     public static void SetupGameOverController()
     {
         Scene currentScene = SceneManager.GetActiveScene();

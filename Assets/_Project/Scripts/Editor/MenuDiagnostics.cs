@@ -3,16 +3,11 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-/// Temporary diagnostic: prints how the world space menu panel is actually sized.
-[InitializeOnLoad]
+/// Diagnostic utility: prints how the world space menu panel is actually sized.
 public static class MenuDiagnostics
 {
-    static MenuDiagnostics()
-    {
-        EditorApplication.delayCall += Report;
-    }
-
-    static void Report()
+    [MenuItem("Tools/Backrooms/Maintenance/Run Menu Diagnostics")]
+    public static void Report()
     {
         UIDocument doc = Object.FindAnyObjectByType<UIDocument>();
         if (doc == null)

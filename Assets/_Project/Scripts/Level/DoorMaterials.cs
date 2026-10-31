@@ -13,14 +13,57 @@ public static class DoorMaterials
     private static Material lockerMetal;
     private static Material lockerInterior;
 
-    public static Material DoorWood => doorWood ??= CreateDoorWoodMaterial();
-    public static Material DoorFrame => doorFrame ??= CreateDoorFrameMaterial();
-    public static Material DoorHandle => doorHandle ??= CreateDoorHandleMaterial();
-    public static Material LockerMetal => lockerMetal ??= CreateLockerMetalMaterial();
-    public static Material LockerInterior => lockerInterior ??= CreateLockerInteriorMaterial();
+    public static Material DoorWood
+    {
+        get
+        {
+            if (doorWood == null) doorWood = CreateDoorWoodMaterial();
+            return doorWood;
+        }
+    }
+
+    public static Material DoorFrame
+    {
+        get
+        {
+            if (doorFrame == null) doorFrame = CreateDoorFrameMaterial();
+            return doorFrame;
+        }
+    }
+
+    public static Material DoorHandle
+    {
+        get
+        {
+            if (doorHandle == null) doorHandle = CreateDoorHandleMaterial();
+            return doorHandle;
+        }
+    }
+
+    public static Material LockerMetal
+    {
+        get
+        {
+            if (lockerMetal == null) lockerMetal = CreateLockerMetalMaterial();
+            return lockerMetal;
+        }
+    }
+
+    public static Material LockerInterior
+    {
+        get
+        {
+            if (lockerInterior == null) lockerInterior = CreateLockerInteriorMaterial();
+            return lockerInterior;
+        }
+    }
 
     private static Material CreateDoorWoodMaterial()
     {
+#if UNITY_EDITOR
+        var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Environment/Backrooms/Materials/M_Backrooms_DoorWood.mat");
+        if (existing != null) return existing;
+#endif
         Texture2D tex = MakeDoorWoodTexture();
         Material m = CreateLitMaterial("Door_Institutional_Wood", tex, 0.15f, 0.45f, Color.black);
         return m;
@@ -28,6 +71,10 @@ public static class DoorMaterials
 
     private static Material CreateDoorFrameMaterial()
     {
+#if UNITY_EDITOR
+        var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Environment/Backrooms/Materials/M_Backrooms_DoorFrame.mat");
+        if (existing != null) return existing;
+#endif
         Texture2D tex = MakeDoorFrameTexture();
         Material m = CreateLitMaterial("Door_Frame_Trim", tex, 0.25f, 0.35f, Color.black);
         return m;
@@ -35,6 +82,10 @@ public static class DoorMaterials
 
     private static Material CreateDoorHandleMaterial()
     {
+#if UNITY_EDITOR
+        var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Environment/Backrooms/Materials/M_Backrooms_DoorHandle.mat");
+        if (existing != null) return existing;
+#endif
         Material m = CreateLitMaterial("Door_Handle_Brass", null, 0.88f, 0.72f, Color.black);
         if (m.HasProperty("_BaseColor"))
             m.SetColor("_BaseColor", new Color(0.85f, 0.75f, 0.42f));
@@ -59,8 +110,12 @@ public static class DoorMaterials
     private static Material CreateLitMaterial(string matName, Texture2D tex, float metallic, float smoothness, Color emission)
     {
         Shader sh = Shader.Find("Universal Render Pipeline/Lit");
+        if (sh == null || !sh.isSupported) sh = Shader.Find("Universal Render Pipeline/Simple Lit");
+        if (sh == null || !sh.isSupported) sh = Shader.Find("Universal Render Pipeline/Unlit");
         if (sh == null) sh = Shader.Find("Standard");
+
         Material m = new Material(sh) { name = matName };
+        m.hideFlags = HideFlags.DontSave;
 
         if (tex != null)
         {
@@ -179,6 +234,7 @@ public static class DoorMaterials
     private static Texture2D Bake(Color32[] px, int size)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, true, false);
+        tex.hideFlags = HideFlags.DontSave;
         tex.wrapMode = TextureWrapMode.Repeat;
         tex.filterMode = FilterMode.Bilinear;
         tex.anisoLevel = 2;

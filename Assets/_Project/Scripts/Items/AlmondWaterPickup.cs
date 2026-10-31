@@ -14,7 +14,7 @@ public class AlmondWaterPickup : MonoBehaviour
 
     [Header("Pickup Settings")]
     [Tooltip("Maximum interaction distance in metres.")]
-    public float interactDistance = 2.4f;
+    public float interactDistance = 3.6f;
 
     [Tooltip("Subtle vertical floating bob speed.")]
     public float bobSpeed = 2.2f;
@@ -98,6 +98,16 @@ public class AlmondWaterPickup : MonoBehaviour
             capsule.center = new Vector3(0f, 0.13f, 0f);
             capsule.isTrigger = true;
         }
+
+        // Remove any glow beacon if present so Almond Water does not emit light
+        Transform glowChild = transform.Find("AlmondGlow");
+        if (glowChild != null)
+        {
+            if (Application.isPlaying)
+                Destroy(glowChild.gameObject);
+            else
+                DestroyImmediate(glowChild.gameObject);
+        }
     }
 
     /// <summary>
@@ -105,12 +115,18 @@ public class AlmondWaterPickup : MonoBehaviour
     /// </summary>
     public bool CanPlayerInteract(Vector3 eyePos, Vector3 lookDir, out float distance)
     {
-        distance = Vector3.Distance(eyePos, transform.position + Vector3.up * 0.12f);
+        Vector3 bottleCenter = transform.position + Vector3.up * 0.12f;
+        distance = Vector3.Distance(eyePos, bottleCenter);
         if (distance > interactDistance) return false;
 
-        Vector3 toBottle = ((transform.position + Vector3.up * 0.12f) - eyePos).normalized;
+        Vector3 toBottle = (bottleCenter - eyePos).normalized;
         float dot = Vector3.Dot(lookDir, toBottle);
-        return dot > 0.65f; // within field of view
+
+        // Generous detection: looking generally towards the bottle (dot > 0.40) or standing close (< 2.2m) glancing down
+        if (dot > 0.40f) return true;
+        if (distance < 2.2f && dot > 0.18f) return true;
+
+        return false;
     }
 
     /// <summary>

@@ -14,7 +14,7 @@ public class PlayerDoorInteraction : MonoBehaviour
 
     [Header("Interaction Settings")]
     [Tooltip("Maximum interaction distance in metres.")]
-    public float interactDistance = 2.8f;
+    public float interactDistance = 3.5f;
     [Tooltip("Maximum angle between view direction and door for prompt to show.")]
     [Range(20f, 120f)] public float facingAngle = 75f;
 

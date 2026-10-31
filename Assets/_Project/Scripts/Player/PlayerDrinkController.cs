@@ -22,13 +22,13 @@ public class PlayerDrinkController : MonoBehaviour
     public float lowerDuration = 0.55f;
 
     [Header("Viewmodel Poses (Relative to Camera)")]
-    public Vector3 restPos = new Vector3(0.28f, -0.65f, 0.45f);
-    public Vector3 readyPos = new Vector3(0.18f, -0.22f, 0.42f);
-    public Vector3 mouthPos = new Vector3(0.08f, -0.06f, 0.32f);
+    public Vector3 restPos = new Vector3(0.24f, -0.55f, 0.42f);
+    public Vector3 readyPos = new Vector3(0.16f, -0.22f, 0.38f);
+    public Vector3 mouthPos = new Vector3(0.02f, -0.10f, 0.28f);
 
-    public Vector3 restRot = new Vector3(-25f, 15f, -10f);
-    public Vector3 readyRot = new Vector3(-5f, 0f, 0f);
-    public Vector3 mouthRot = new Vector3(58f, -8f, 14f);
+    public Vector3 restRot = new Vector3(15f, 160f, -8f);
+    public Vector3 readyRot = new Vector3(4f, 175f, -4f);
+    public Vector3 mouthRot = new Vector3(-58f, 180f, 0f);
 
     private Transform _cameraTransform;
     private GameObject _viewModelBottle;

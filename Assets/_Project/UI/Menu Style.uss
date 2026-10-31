@@ -222,6 +222,24 @@
     color: rgb(12, 12, 6);
 }
 
+.menu-root .menu-button--highlight {
+    color: rgb(210, 245, 180);
+    border-left-color: rgb(120, 220, 140);
+    background-color: rgba(90, 210, 120, 0.12);
+}
+
+.menu-root .menu-button--highlight:hover {
+    background-color: rgba(90, 210, 120, 0.25);
+    border-left-color: rgb(150, 255, 170);
+    color: rgb(180, 255, 190);
+}
+
+.menu-root .menu-button--highlight:focus {
+    background-color: rgba(90, 210, 120, 0.30);
+    border-left-color: rgb(150, 255, 170);
+    color: rgb(180, 255, 190);
+}
+
 .hint {
     margin-top: 22px;
     font-size: 18px;

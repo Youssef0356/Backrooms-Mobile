@@ -62,7 +62,7 @@ public class LockerHideSpot : MonoBehaviour
     {
         GameObject go = new GameObject("LockerHideSpot");
         go.transform.SetParent(parent, false);
-        go.transform.position = new Vector3(floorPos.x, 0f, floorPos.z);
+        go.transform.position = floorPos;
         go.transform.rotation = Quaternion.LookRotation(forwardDir, Vector3.up);
 
         LockerHideSpot spot = go.AddComponent<LockerHideSpot>();

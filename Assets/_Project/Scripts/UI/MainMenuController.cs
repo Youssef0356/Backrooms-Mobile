@@ -32,7 +32,11 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] float fadeOutDuration = 0.35f;
 
     [Header("Music")]
-    [Tooltip("A random track from Resources/SFX plays on loop in the menu. Clips whose name contains this fragment are skipped, so the level's own soundtrack is not used here.")]
+    [Tooltip("Specific audio clip to play for the main menu. If not assigned, an authentic Backrooms Lobby soundtrack is loaded automatically.")]
+    [SerializeField] AudioClip menuMusicClip;
+    [Tooltip("If true, loops the menu soundtrack.")]
+    [SerializeField] bool loopMusic = true;
+    [SerializeField] float musicFadeDuration = 1.0f;
     [SerializeField] string levelSoundtrackName = "backrooms level0";
 
     UIDocument document;
@@ -54,6 +58,8 @@ public class MainMenuController : MonoBehaviour
     VisualElement versionBlock;
     VisualElement statusBlock;
 
+    Button continueButton;
+    VisualElement continueMenuItem;
     Button playButton;
     Button settingsButton;
     Button controlsButton;
@@ -107,6 +113,8 @@ public class MainMenuController : MonoBehaviour
         versionBlock = root.Q<VisualElement>("version-block");
         statusBlock = root.Q<VisualElement>("status-block");
 
+        continueButton = root.Q<Button>("continue-button");
+        continueMenuItem = root.Q<VisualElement>("menu-item-continue");
         playButton = root.Q<Button>("play-button");
         settingsButton = root.Q<Button>("settings-button");
         controlsButton = root.Q<Button>("controls-button");
@@ -138,6 +146,8 @@ public class MainMenuController : MonoBehaviour
     {
         UnityEngine.Cursor.lockState = CursorLockMode.None;
         UnityEngine.Cursor.visible = true;
+
+        GameProgressManager.OnProgressChanged += UpdateCheckpointUI;
 
         ApplyFont();
         FillVersionBlock();
@@ -177,6 +187,8 @@ public class MainMenuController : MonoBehaviour
 
     void OnDisable()
     {
+        GameProgressManager.OnProgressChanged -= UpdateCheckpointUI;
+
         if (flickerRoutine != null) StopCoroutine(flickerRoutine);
         flickerRoutine = null;
 
@@ -218,10 +230,13 @@ public class MainMenuController : MonoBehaviour
 
     void WireButtons()
     {
+        WireButtonRow(continueButton, OnContinueClicked);
         WireButtonRow(playButton, OnPlayClicked);
         WireButtonRow(quitButton, OnQuitClicked);
         WireButtonRow(settingsButton, OnSettingsClicked);
         WireButtonRow(controlsButton, OnControlsClicked);
+
+        UpdateCheckpointUI();
 
         if (settingsCloseButton != null) settingsCloseButton.clicked += CloseSettings;
         if (controlsCloseButton != null) controlsCloseButton.clicked += CloseControls;
@@ -371,7 +386,7 @@ public class MainMenuController : MonoBehaviour
         });
     }
 
-    /// Picks one of the non-level tracks at random and loops it under the menu.
+    /// Starts atmospheric Backrooms ambient music for the main menu.
     void StartMenuMusic()
     {
         if (menuMusic != null)
@@ -380,29 +395,71 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        AudioClip[] all = Resources.LoadAll<AudioClip>("SFX");
+        AudioClip clipToPlay = menuMusicClip;
 
-        List<AudioClip> pool = new List<AudioClip>();
-        foreach (AudioClip clip in all)
+        if (clipToPlay == null)
         {
-            if (clip == null) continue;
-
-            bool isLevelTrack = !string.IsNullOrEmpty(levelSoundtrackName) &&
-                clip.name.IndexOf(levelSoundtrackName, System.StringComparison.OrdinalIgnoreCase) >= 0;
-
-            if (!isLevelTrack) pool.Add(clip);
+            // First choice: The Lobby soundtrack
+            clipToPlay = Resources.Load<AudioClip>("SFX/juanjo_ sound - The Lobby");
         }
 
-        if (pool.Count == 0) pool.AddRange(all);   // nothing left: fall back to every clip
-        if (pool.Count == 0) return;
+        if (clipToPlay == null)
+        {
+            // Search SFX specifically for dedicated soundtrack tracks
+            AudioClip[] all = Resources.LoadAll<AudioClip>("SFX");
+            foreach (AudioClip clip in all)
+            {
+                if (clip == null) continue;
+                if (clip.name.IndexOf("The Lobby", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    clip.name.IndexOf("Pseudoliminality", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    clip.name.IndexOf("continuum", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    clip.name.IndexOf("The Bluerooms", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    clipToPlay = clip;
+                    break;
+                }
+            }
+        }
+
+        if (clipToPlay == null)
+        {
+            // Fallback: only select real music/ambient tracks (> 45 seconds), NEVER sound effects/footsteps/roars
+            AudioClip[] all = Resources.LoadAll<AudioClip>("SFX");
+            foreach (AudioClip clip in all)
+            {
+                if (clip != null && clip.length > 45f && clip.name.IndexOf("level0 ambience", System.StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    clipToPlay = clip;
+                    break;
+                }
+            }
+        }
+
+        if (clipToPlay == null) return;
 
         menuMusic = gameObject.AddComponent<AudioSource>();
-        menuMusic.clip = pool[Random.Range(0, pool.Count)];
-        menuMusic.loop = true;
+        menuMusic.clip = clipToPlay;
+        menuMusic.loop = loopMusic;
         menuMusic.playOnAwake = false;
         menuMusic.spatialBlend = 0f;
-        menuMusic.volume = GameSettings.MusicVolume;
+        menuMusic.volume = 0f;
         menuMusic.Play();
+
+        StartCoroutine(FadeInMenuMusic(GameSettings.MusicVolume, musicFadeDuration));
+    }
+
+    IEnumerator FadeInMenuMusic(float targetVolume, float duration)
+    {
+        if (menuMusic == null) yield break;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            if (menuMusic == null) yield break;
+            elapsed += Time.unscaledDeltaTime;
+            menuMusic.volume = Mathf.Lerp(0f, targetVolume, elapsed / duration);
+            yield return null;
+        }
+        if (menuMusic != null) menuMusic.volume = targetVolume;
     }
 
     void WireSensitivity()
@@ -534,9 +591,50 @@ public class MainMenuController : MonoBehaviour
         if (label != null) label.text = Mathf.RoundToInt(value * 100f) + "%";
     }
 
+    void UpdateCheckpointUI()
+    {
+        bool hasCheckpoint = GameProgressManager.HasCheckpoint();
+        if (continueMenuItem != null)
+        {
+            if (hasCheckpoint)
+            {
+                continueMenuItem.style.display = DisplayStyle.Flex;
+                continueMenuItem.RemoveFromClassList("is-hidden");
+                int lvl = GameProgressManager.GetCheckpointLevelNumber();
+                if (continueButton != null)
+                {
+                    continueButton.text = $"RESUME LEVEL {lvl}";
+                }
+            }
+            else
+            {
+                continueMenuItem.style.display = DisplayStyle.None;
+                continueMenuItem.AddToClassList("is-hidden");
+            }
+        }
+
+        if (playButton != null)
+        {
+            playButton.text = hasCheckpoint ? "NEW RUN" : "ENTER";
+        }
+    }
+
     // ------------------------------------------------------------- behaviour
 
-    void OnPlayClicked() => StartCoroutine(FadeOutThen(LoadGame));
+    void OnContinueClicked() => StartCoroutine(FadeOutThen(GameProgressManager.ResumeGame));
+
+    void OnPlayClicked()
+    {
+        if (GameProgressManager.HasCheckpoint())
+        {
+            // Player chose to restart from Level 0
+            StartCoroutine(FadeOutThen(GameProgressManager.StartNewGame));
+        }
+        else
+        {
+            StartCoroutine(FadeOutThen(LoadGame));
+        }
+    }
 
     void OnQuitClicked() => StartCoroutine(FadeOutThen(QuitGame));
 
@@ -647,15 +745,26 @@ public class MainMenuController : MonoBehaviour
 
         float start = 1f;
         float elapsed = 0f;
+        float startMusicVol = menuMusic != null ? menuMusic.volume : 0f;
 
         while (elapsed < fadeOutDuration)
         {
             elapsed += Time.unscaledDeltaTime;
-            SetOpacity(Mathf.Lerp(start, 0f, elapsed / fadeOutDuration));
+            float t = elapsed / fadeOutDuration;
+            SetOpacity(Mathf.Lerp(start, 0f, t));
+            if (menuMusic != null)
+            {
+                menuMusic.volume = Mathf.Lerp(startMusicVol, 0f, t);
+            }
             yield return null;
         }
 
         SetOpacity(0f);
+        if (menuMusic != null)
+        {
+            menuMusic.volume = 0f;
+            menuMusic.Stop();
+        }
         action?.Invoke();
     }
 

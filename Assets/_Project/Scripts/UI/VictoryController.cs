@@ -36,11 +36,12 @@ public class VictoryController : MonoBehaviour
 
     [Header("Scene Navigation")]
     [SerializeField] string menuSceneName = "Menu";
+    [SerializeField] string nextSceneName = "Level94";
 
     [Header("Labels & Text")]
     [SerializeField] string headingLabel = "LEVEL 0 ESCAPED";
     [SerializeField] string subtitleLabel = "ANOMALOUS THRESHOLD BREACHED - STATUS: EXTRACTED";
-    [SerializeField] string retryButtonLabel = "ENTER NEXT SECTOR";
+    [SerializeField] string retryButtonLabel = "ENTER LEVEL 94";
     [SerializeField] string menuButtonLabel = "RETURN TO MENU";
     [SerializeField] string clearanceLevel = "ARCHIVE CLEAR // CLASS 1";
 
@@ -132,6 +133,19 @@ public class VictoryController : MonoBehaviour
         IsGameWon = true;
         OnPlayerEscaped?.Invoke();
 
+        // Save progress / checkpoint for the next level
+        string activeScene = SceneManager.GetActiveScene().name;
+        if (activeScene.IndexOf("94", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            // Level 94 victory
+            GameProgressManager.SaveCheckpoint(GameProgressManager.MenuSceneName, 94);
+        }
+        else
+        {
+            // Level 0 victory -> Checkpoint at Level 94!
+            GameProgressManager.SaveCheckpoint(GameProgressManager.Level94SceneName, 94);
+        }
+
         DisablePlayerInput();
         HideMobileControls();
         PlayVictoryAudio();
@@ -214,17 +228,24 @@ public class VictoryController : MonoBehaviour
         Time.timeScale = 1f;
         RestoreCursor();
 
+        string targetScene = SceneManager.GetActiveScene().name;
+        if (!string.IsNullOrEmpty(nextSceneName) && Application.CanStreamedLevelBeLoaded(nextSceneName))
+        {
+            targetScene = nextSceneName;
+        }
+
+        string finalTargetScene = targetScene;
         if (AdManager.Instance != null)
         {
             AdManager.Instance.TryShowInterstitial(() =>
             {
                 AdManager.Instance.ResetRunState();
-                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+                SceneManager.LoadScene(finalTargetScene);
             });
         }
         else
         {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            SceneManager.LoadScene(finalTargetScene);
         }
     }
 

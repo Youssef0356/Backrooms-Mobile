@@ -107,7 +107,7 @@ public class PlayerSanity : MonoBehaviour
             return;
         }
 
-        // 2. Active creature terror
+        // 2. Active creature terror (Villain / Smily Hound)
         VillainAI villain = VillainAI.Instance;
         float fearDrain = 0f;
         if (villain != null && villain.isActiveAndEnabled)
@@ -117,6 +117,19 @@ public class PlayerSanity : MonoBehaviour
                 fearDrain += chaseDrainPerSecond * dt;
             }
             else if (villain.CurrentState == VillainAI.State.Investigate)
+            {
+                fearDrain += searchDrainPerSecond * dt;
+            }
+        }
+
+        SmilyHoundAI hound = SmilyHoundAI.Instance;
+        if (hound != null && hound.isActiveAndEnabled)
+        {
+            if (hound.CurrentState == SmilyHoundAI.HoundState.Chasing || hound.CurrentState == SmilyHoundAI.HoundState.Pouncing)
+            {
+                fearDrain += chaseDrainPerSecond * 1.6f * dt;
+            }
+            else if (hound.CurrentState == SmilyHoundAI.HoundState.InvestigatingSound)
             {
                 fearDrain += searchDrainPerSecond * dt;
             }

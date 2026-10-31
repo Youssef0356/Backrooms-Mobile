@@ -51,6 +51,12 @@ public class CameraVHSGlitch : MonoBehaviour
     int lastOsdSec = -1;
     bool lastDotOn = false;
 
+    // Layout tracking for OSD safe area and HUD button spacing
+    Rect lastAppliedSafeArea;
+    int lastScreenWidth;
+    int lastScreenHeight;
+    float lastClusterLeftEdge = -1f;
+
     // Post-processing references
     Volume atmosphereVolume;
     ChromaticAberration chromaticAberration;
@@ -246,17 +252,18 @@ public class CameraVHSGlitch : MonoBehaviour
         Color osdColor = new Color(0.95f, 0.95f, 0.90f, 0.85f);
 
         recText = CreateOSDLabel("REC_Label", osdContainer, font, osdColor, 28, TextAnchor.UpperLeft,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(50f, -40f), new Vector2(300f, 60f));
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(45f, -38f), new Vector2(300f, 60f));
 
+        // Placed cleanly to the left of the top-right button cluster ([?] and [⚙])
         spText = CreateOSDLabel("SP_Label", osdContainer, font, osdColor, 26, TextAnchor.UpperRight,
-            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-120f, -40f), new Vector2(300f, 60f));
+            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-180f, -38f), new Vector2(300f, 60f));
         spText.text = "SP  [|||]";
 
         playText = CreateOSDLabel("PLAY_Label", osdContainer, font, osdColor, 26, TextAnchor.LowerLeft,
-            new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(50f, 40f), new Vector2(400f, 60f));
+            new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(45f, 38f), new Vector2(400f, 60f));
 
         dateText = CreateOSDLabel("DATE_Label", osdContainer, font, osdColor, 26, TextAnchor.LowerRight,
-            new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-50f, 40f), new Vector2(400f, 60f));
+            new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-45f, 38f), new Vector2(400f, 60f));
         dateText.text = "OCT. 22 1996";
     }
 
@@ -356,6 +363,8 @@ public class CameraVHSGlitch : MonoBehaviour
         if (glitchMaterial != null)
         {
             glitchMaterial.SetFloat("_GlitchIntensity", effectiveGlitch);
+            float pulse = ChaseSoundtrackDirector.CurrentHeartbeatPulse;
+            glitchMaterial.SetFloat("_PursuitPulse", ChaseSoundtrackDirector.IsPursuitActive ? pulse : 0f);
         }
 
         // Update URP Post-Processing
@@ -376,29 +385,37 @@ public class CameraVHSGlitch : MonoBehaviour
 
     void CalculateGlitchTarget()
     {
-        if (!enableProximityGlitch)
+        float pursuitGlitch = 0f;
+        if (ChaseSoundtrackDirector.IsPursuitActive)
+        {
+            float pDist = ChaseSoundtrackDirector.CurrentClosestDistance;
+            float pt = 1f - Mathf.Clamp01((pDist - intenseGlitchDistance) / (maxGlitchDistance - intenseGlitchDistance));
+            pursuitGlitch = Mathf.Clamp01(pt * pt + chaseGlitchBoost * 1.5f);
+        }
+
+        if (!enableProximityGlitch && pursuitGlitch <= 0.001f)
         {
             targetGlitch = 0f;
             return;
         }
 
-        float dist = Vector3.Distance(player.position, villain.position);
+        float dist = (player != null && villain != null) ? Vector3.Distance(player.position, villain.position) : 999f;
 
         if (dist >= maxGlitchDistance)
         {
-            targetGlitch = 0f;
+            targetGlitch = pursuitGlitch;
             return;
         }
 
         // Linear ramp between max distance and intense distance
         float t = 1f - Mathf.Clamp01((dist - intenseGlitchDistance) / (maxGlitchDistance - intenseGlitchDistance));
-        targetGlitch = t * t; // exponential curve: builds dread smoothly, then spikes
+        targetGlitch = Mathf.Max(pursuitGlitch, t * t); // exponential curve: builds dread smoothly, then spikes
 
         // Check villain state
-        VillainAI ai = villain.GetComponent<VillainAI>();
-        if (ai != null)
+        if (villain != null)
         {
-            if (ai.CurrentState == VillainAI.State.Chase)
+            VillainAI ai = villain.GetComponent<VillainAI>();
+            if (ai != null && ai.CurrentState == VillainAI.State.Chase)
             {
                 targetGlitch = Mathf.Clamp01(targetGlitch + chaseGlitchBoost);
             }
@@ -409,24 +426,112 @@ public class CameraVHSGlitch : MonoBehaviour
     {
         if (!enableChromaticAberration) return;
 
+        float heartbeatPulse = ChaseSoundtrackDirector.IsPursuitActive ? ChaseSoundtrackDirector.CurrentHeartbeatPulse : 0f;
+
         if (chromaticAberration != null)
         {
-            chromaticAberration.intensity.value = Mathf.Lerp(baseChromatic, 0.22f, glitch);
+            // Flares outward during pursuit heartbeat pulses
+            float targetChromatic = Mathf.Lerp(baseChromatic, 0.28f, glitch) + heartbeatPulse * 0.15f;
+            chromaticAberration.intensity.value = Mathf.Clamp01(targetChromatic);
         }
 
         if (filmGrain != null)
         {
-            filmGrain.intensity.value = Mathf.Lerp(baseGrain, 0.35f, glitch);
+            // Keep grain crisp and non-blinding so view is clear
+            filmGrain.intensity.value = Mathf.Lerp(baseGrain, 0.22f, glitch);
         }
 
         if (vignette != null)
         {
-            vignette.intensity.value = Mathf.Lerp(baseVignette, 0.42f, glitch);
+            // Vignette darkens slightly during chase pulses for tunnel-vision fear
+            float targetVig = Mathf.Lerp(baseVignette, 0.44f, glitch) + heartbeatPulse * 0.08f;
+            vignette.intensity.value = Mathf.Clamp(targetVig, 0f, 0.58f);
+        }
+    }
+
+    /// <summary>
+    /// Dynamically aligns all camera OSD elements to respect the device safe area
+    /// and maintains clean spacing from the top-right button cluster ([?] guide and [⚙] pause).
+    /// </summary>
+    void UpdateOSDLayout()
+    {
+        Rect safeArea = Screen.safeArea;
+        if (safeArea.width <= 0f || safeArea.height <= 0f)
+            safeArea = new Rect(0f, 0f, Screen.width, Screen.height);
+
+        float clusterLeftEdge = -1f;
+        if (PauseMenuController.Instance != null)
+        {
+            clusterLeftEdge = PauseMenuController.Instance.TopRightButtonClusterLeftEdge;
+        }
+
+        if (safeArea == lastAppliedSafeArea &&
+            Screen.width == lastScreenWidth &&
+            Screen.height == lastScreenHeight &&
+            Mathf.Approximately(clusterLeftEdge, lastClusterLeftEdge))
+        {
+            return;
+        }
+
+        lastAppliedSafeArea = safeArea;
+        lastScreenWidth = Screen.width;
+        lastScreenHeight = Screen.height;
+        lastClusterLeftEdge = clusterLeftEdge;
+
+        float toCanvasX = 1920f / Mathf.Max(1f, Screen.width);
+        float toCanvasY = 1080f / Mathf.Max(1f, Screen.height);
+
+        float insetLeft = safeArea.xMin * toCanvasX;
+        float insetRight = (Screen.width - safeArea.xMax) * toCanvasX;
+        float insetTop = (Screen.height - safeArea.yMax) * toCanvasY;
+        float insetBottom = safeArea.yMin * toCanvasY;
+
+        // Top-left REC indicator
+        if (recText != null)
+        {
+            recText.rectTransform.anchoredPosition = new Vector2(45f + insetLeft, -(38f + insetTop));
+        }
+
+        // Top-right SP & Battery HUD: dynamically spaced left of button cluster with generous padding
+        if (spText != null)
+        {
+            float spOffset;
+            if (clusterLeftEdge > 0f)
+            {
+                // Top-right buttons are active: place SP indicator to the left of the button cluster with a clean 28px gap
+                spOffset = clusterLeftEdge + 28f;
+            }
+            else if (PauseMenuController.Instance == null)
+            {
+                // Default fallback when buttons exist in standard scene: cluster width (~148f) + safe area inset + 28px gap
+                spOffset = 148f + insetRight + 28f;
+            }
+            else
+            {
+                // No buttons active: standard camcorder edge margin
+                spOffset = 45f + insetRight;
+            }
+
+            spText.rectTransform.anchoredPosition = new Vector2(-spOffset, -(38f + insetTop));
+        }
+
+        // Bottom-left PLAY timecode
+        if (playText != null)
+        {
+            playText.rectTransform.anchoredPosition = new Vector2(45f + insetLeft, 38f + insetBottom);
+        }
+
+        // Bottom-right date stamp
+        if (dateText != null)
+        {
+            dateText.rectTransform.anchoredPosition = new Vector2(-(45f + insetRight), 38f + insetBottom);
         }
     }
 
     void UpdateOSD(float glitch)
     {
+        UpdateOSDLayout();
+
         if (recText != null)
         {
             // Blinking red dot every 1.2 seconds

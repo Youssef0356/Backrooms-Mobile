@@ -114,6 +114,40 @@ public class PauseMenuController : MonoBehaviour
     Rect appliedSafeArea;
     int appliedScreenWidth;
     int appliedScreenHeight;
+    float appliedInsetRight;
+    float appliedInsetTop;
+
+    /// <summary>
+    /// True when the mobile pause/settings [⚙] button is visible on screen.
+    /// </summary>
+    public bool HasVisiblePauseButton => showPauseButton && pauseButton != null && pauseButton.style.display != DisplayStyle.None;
+
+    /// <summary>
+    /// True when the mobile survival guide [?] button is visible on screen.
+    /// </summary>
+    public bool HasVisibleGuideButton => showGuideButton && guideButton != null && guideButton.style.display != DisplayStyle.None;
+
+    public float AppliedInsetRight => appliedInsetRight;
+    public float AppliedInsetTop => appliedInsetTop;
+
+    /// <summary>
+    /// Returns the total distance from the right screen edge to the left edge of the top-right HUD buttons.
+    /// Used by CameraVHSGlitch to place the camera HUD cleanly without any overlap.
+    /// </summary>
+    public float TopRightButtonClusterLeftEdge
+    {
+        get
+        {
+            if (!HasVisiblePauseButton && !HasVisibleGuideButton)
+                return 0f;
+
+            float rightPos = HudButtonMargin + appliedInsetRight;
+            if (HasVisibleGuideButton)
+                return rightPos + 68f + 56f;
+
+            return rightPos + 56f;
+        }
+    }
 
     BackroomsAmbience ambience;
     float previousTimeScale = 1f;
@@ -394,6 +428,9 @@ public class PauseMenuController : MonoBehaviour
         float insetRight = Mathf.Max(0f, (Screen.width - safeArea.xMax) * toPanelX);
         float insetTop = Mathf.Max(0f, (Screen.height - safeArea.yMax) * toPanelY);
 
+        appliedInsetRight = insetRight;
+        appliedInsetTop = insetTop;
+
         float rightPos = HudButtonMargin + insetRight;
         float topPos = HudButtonMargin + insetTop;
 
@@ -664,12 +701,18 @@ public class PauseMenuController : MonoBehaviour
             controlsCard.Add(MakeControlRow("RIGHT SCREEN", "SWIPE TO LOOK"));
             controlsCard.Add(MakeControlRow("FLASHLIGHT ICON", "TOGGLE FLASHLIGHT"));
             controlsCard.Add(MakeControlRow("SPRINT ICON", "HOLD TO SPRINT"));
+            controlsCard.Add(MakeControlRow("TAP PROMPT / CHALK", "TAKE WATER / DRAW CHALK"));
+            controlsCard.Add(MakeControlRow("CHALK BUTTON", "DRAW OR CYCLE MARK (X, ->, V)"));
             controlsCard.Add(MakeControlRow("TOP RIGHT GEAR", "PAUSE & SETTINGS"));
         }
         else
         {
             controlsCard.Add(MakeControlRow("W A S D", "MOVE"));
             controlsCard.Add(MakeControlRow("MOUSE", "LOOK AROUND"));
+            controlsCard.Add(MakeControlRow("E", "TAKE ALMOND WATER / INTERACT"));
+            controlsCard.Add(MakeControlRow("Q", "DRINK ALMOND WATER (RESTORES SANITY)"));
+            controlsCard.Add(MakeControlRow("C", "DRAW CHALK MARK ON WALL"));
+            controlsCard.Add(MakeControlRow("V", "CYCLE CHALK SYMBOL (X, ->, V)"));
             controlsCard.Add(MakeControlRow("F", "FLASHLIGHT"));
             controlsCard.Add(MakeControlRow("SHIFT", "SPRINT"));
             controlsCard.Add(MakeControlRow("SPACE", "JUMP"));
@@ -776,6 +819,9 @@ public class PauseMenuController : MonoBehaviour
             secControls.Add(MakeControlRow("RIGHT SCREEN", "SWIPE ANYWHERE TO AIM CAMERA"));
             secControls.Add(MakeControlRow("TORCH ICON", "TOGGLE FLASHLIGHT ON / OFF"));
             secControls.Add(MakeControlRow("SPRINT ICON", "HOLD TO RUN (WARNING: LOUD NOISE!)"));
+            secControls.Add(MakeControlRow("TAP PROMPT", "TAKE ALMOND WATER / INTERACT"));
+            secControls.Add(MakeControlRow("ALMOND BUTTON", "DRINK ALMOND WATER (RESTORES SANITY)"));
+            secControls.Add(MakeControlRow("CHALK BUTTON", "DRAW CHALK MARK / CYCLE MARK"));
             secControls.Add(MakeControlRow("GEAR ICON [⚙]", "PAUSE, SENSITIVITY, SOUND & VIDEO"));
             secControls.Add(MakeControlRow("HELP ICON [?]", "REOPEN THIS SURVIVAL MANUAL"));
         }
@@ -783,6 +829,10 @@ public class PauseMenuController : MonoBehaviour
         {
             secControls.Add(MakeControlRow("W A S D", "MOVE AROUND CORRIDORS"));
             secControls.Add(MakeControlRow("MOUSE", "AIM & LOOK AROUND"));
+            secControls.Add(MakeControlRow("E", "TAKE ALMOND WATER / INTERACT"));
+            secControls.Add(MakeControlRow("Q", "DRINK ALMOND WATER (RESTORES SANITY)"));
+            secControls.Add(MakeControlRow("C", "DRAW CHALK MARK ON WALL"));
+            secControls.Add(MakeControlRow("V", "CYCLE CHALK SYMBOL (X, ->, V)"));
             secControls.Add(MakeControlRow("F", "TOGGLE FLASHLIGHT"));
             secControls.Add(MakeControlRow("SHIFT (HOLD)", "SPRINT (WARNING: LOUD NOISE!)"));
             secControls.Add(MakeControlRow("SPACE", "JUMP"));
@@ -808,6 +858,16 @@ public class PauseMenuController : MonoBehaviour
         secSurvival.Add(MakeGuideBox(
             "RULE 3: CORRIDOR EVASION & FLANKING",
             "The entity anticipates player movement in loops. When running away, take two sharp turns around consecutive corners, then STOP sprinting. The monster will stop and search your last seen position instead of cutting you off ahead.",
+            false));
+
+        secSurvival.Add(MakeGuideBox(
+            "RULE 4: FLOODED / WET CARPET ZONES",
+            "CRITICAL: Murky stagnant water pools cover certain sectors. Footsteps in water produce loud wet splashes that radiate noise up to 26 meters away, instantly drawing entities from adjacent wings. Tread cautiously through flooded rooms!",
+            true));
+
+        secSurvival.Add(MakeGuideBox(
+            "RULE 5: NAVIGATIONAL CHALK MARKINGS",
+            "Draw chalk markings on walls ([C] or mobile Chalk button) to mark dead ends with 'X', path ways with arrows, or cleared sectors with checkmarks ([V] to cycle). Essential for surviving the labyrinth.",
             false));
 
         // Tab click events

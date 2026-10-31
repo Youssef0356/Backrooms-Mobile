@@ -25,7 +25,7 @@ public class PlayerInventory : MonoBehaviour
 
     [Header("Interaction Raycasting")]
     [Tooltip("Maximum distance to detect pickups.")]
-    [SerializeField] private float lookRange = 2.5f;
+    [SerializeField] private float lookRange = 3.6f;
 
     private int _almondWaterCount;
     private Camera _playerCamera;
@@ -46,6 +46,11 @@ public class PlayerInventory : MonoBehaviour
         }
         Instance = this;
         _almondWaterCount = Mathf.Clamp(startingBottles, 0, maxCapacity);
+
+        if (GetComponent<ChalkController>() == null)
+        {
+            gameObject.AddComponent<ChalkController>();
+        }
     }
 
     private void Start()
@@ -124,6 +129,20 @@ public class PlayerInventory : MonoBehaviour
         // 2. Pick up item: [E] or Gamepad West (square / X) or Mobile Tap
         bool pickupPressed = _mobilePickupTapped;
         _mobilePickupTapped = false;
+
+        // Allow direct screen tap in central view area on touchscreen devices
+        if (!pickupPressed && _currentTargetPickup != null)
+        {
+            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+            {
+                Vector2 touchPos = Touchscreen.current.primaryTouch.position.ReadValue();
+                if (touchPos.x > Screen.width * 0.20f && touchPos.x < Screen.width * 0.80f &&
+                    touchPos.y > Screen.height * 0.20f && touchPos.y < Screen.height * 0.80f)
+                {
+                    pickupPressed = true;
+                }
+            }
+        }
 
         if (kb != null && kb.eKey.wasPressedThisFrame) pickupPressed = true;
         if (gp != null && gp.buttonWest.wasPressedThisFrame) pickupPressed = true;

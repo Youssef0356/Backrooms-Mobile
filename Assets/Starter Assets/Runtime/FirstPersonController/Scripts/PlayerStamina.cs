@@ -21,20 +21,20 @@ namespace StarterAssets
         [SerializeField] private float maxStamina = 100f;
 
         [Tooltip("Stamina drained per second while sprinting.")]
-        [SerializeField] private float sprintDrainRate = 18f;
+        [SerializeField] private float sprintDrainRate = 10f; // 10s of sustained sprinting
 
         [Tooltip("Stamina recovered per second while walking.")]
-        [SerializeField] private float walkRegenRate = 16f;
+        [SerializeField] private float walkRegenRate = 22f;
 
         [Tooltip("Stamina recovered per second while standing still.")]
-        [SerializeField] private float idleRegenRate = 24f;
+        [SerializeField] private float idleRegenRate = 35f;
 
         [Tooltip("Delay in seconds after stopping sprint before regeneration begins.")]
-        [SerializeField] private float regenDelay = 0.55f;
+        [SerializeField] private float regenDelay = 0.35f;
 
         [Tooltip("Minimum stamina percentage (0..1) required to recover from exhaustion before sprinting again.")]
         [Range(0.05f, 0.5f)]
-        [SerializeField] private float exhaustionRecoveryFraction = 0.20f;
+        [SerializeField] private float exhaustionRecoveryFraction = 0.15f;
 
         private float _currentStamina;
         private bool _isExhausted;
@@ -50,7 +50,7 @@ namespace StarterAssets
         /// <summary>
         /// True if the player has enough stamina and is not currently exhausted.
         /// </summary>
-        public bool CanSprint => _currentStamina > 1f && !_isExhausted;
+        public bool CanSprint => _currentStamina > 0.05f && !_isExhausted;
 
         private void Awake()
         {
@@ -85,10 +85,15 @@ namespace StarterAssets
                 _regenTimer = regenDelay;
                 _currentStamina = Mathf.Max(0f, _currentStamina - sprintDrainRate * deltaTime);
 
-                if (_currentStamina <= 0.01f && !_isExhausted)
+                // When stamina reaches the bottom threshold (<= 0.8f), snap cleanly to 0 and trigger exhaustion
+                if (_currentStamina <= 0.8f)
                 {
-                    _isExhausted = true;
-                    OnExhaustionChanged?.Invoke(true);
+                    _currentStamina = 0f;
+                    if (!_isExhausted)
+                    {
+                        _isExhausted = true;
+                        OnExhaustionChanged?.Invoke(true);
+                    }
                 }
 
                 OnStaminaChanged?.Invoke(_currentStamina, maxStamina);

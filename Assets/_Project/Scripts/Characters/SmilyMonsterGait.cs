@@ -14,9 +14,9 @@ public class SmilyMonsterGait : MonoBehaviour
     [Tooltip("Movement speed at which the gallop reaches its maximum stride frequency.")]
     public float maxSpeed = 4.2f;
     [Tooltip("Stride cycle frequency at walking/stalking speed (cycles/sec).")]
-    public float walkFrequency = 1.35f;
+    public float walkFrequency = 1.25f;
     [Tooltip("Stride cycle frequency at full sprint/chase speed (cycles/sec).")]
-    public float sprintFrequency = 2.45f;
+    public float sprintFrequency = 1.65f;
 
     [Header("Spine & Body Dynamics")]
     [Tooltip("Vertical body heave (hips bobbing up and down) during the gallop stride.")]
@@ -52,7 +52,11 @@ public class SmilyMonsterGait : MonoBehaviour
     [Tooltip("Duration of the attack pounce animation (seconds).")]
     public float pounceDuration = 0.75f;
 
-    // Bone Transforms
+    [Header("Look Target")]
+    [Tooltip("Target (player camera) the creature's head will actively look at during pursuit.")]
+    public Transform lookTarget;
+
+    [Header("Bone Transforms")]
     private Transform hips;         // spinebase_01
     private Transform spineMid;     // belly_02
     private Transform chest;        // chest_03
@@ -110,6 +114,30 @@ public class SmilyMonsterGait : MonoBehaviour
 
     private bool isPouncing;
     private float pounceTimer;
+
+    // Kill Jumpscare Animation State
+    private bool isKillMauling;
+    private float killMaulTimer;
+    private Transform killTargetCam;
+
+    public Transform Head => head;
+    public Transform Jaw => jaw;
+    public bool IsKillMauling => isKillMauling;
+
+    /// <summary>
+    /// Triggers an intense, cinematic jumpscare kill animation:
+    /// Phase 1: Beast rears up on hind legs, unhinging jaws and towering over player.
+    /// Phase 2: Savage forward bite lunge directly into camera with violent snaps.
+    /// Phase 3: Pins player to floor, towering and growling inches from camera.
+    /// </summary>
+    public void TriggerKillJumpscare(Transform playerCam)
+    {
+        isKillMauling = true;
+        killMaulTimer = 0f;
+        killTargetCam = playerCam;
+        isPouncing = false;
+        gaitWeight = 1f;
+    }
 
     private void Awake()
     {
@@ -227,6 +255,12 @@ public class SmilyMonsterGait : MonoBehaviour
     {
         if (hips == null) return;
 
+        if (isKillMauling)
+        {
+            ApplyKillMaulPose();
+            return;
+        }
+
         // If stationary and not attacking, allow the base Animator idle/breathing clip to play naturally
         if (gaitWeight < 0.005f && !isPouncing) return;
 
@@ -270,6 +304,9 @@ public class SmilyMonsterGait : MonoBehaviour
         if (chest != null)
             chest.localRotation = chestBaseRot * Quaternion.Euler(-spineFlex * 0.45f, 0f, -bodyRoll * 0.3f);
 
+        if (neck != null)
+            neck.localRotation = neckBaseRot;
+
         // -------------------------------------------------------------
         // 2. Forelimbs (Front Left & Front Right Paws)
         // -------------------------------------------------------------
@@ -293,13 +330,29 @@ public class SmilyMonsterGait : MonoBehaviour
                      phaseRR, weight);
 
         // -------------------------------------------------------------
-        // 4. Head & Snapping Jaws
+        // 4. Head & Snapping Jaws (World-Space Horizontal Tracking)
         // -------------------------------------------------------------
         if (head != null)
         {
-            // Head counter-bobs to keep gaze fixed forward on prey
             float headPitch = -Mathf.Sin(t) * headBobAngle * weight;
             head.localRotation = headBaseRot * Quaternion.Euler(headPitch, 0f, 0f);
+
+            if (lookTarget != null)
+            {
+                Vector3 toTarget = (lookTarget.position + Vector3.up * 1.4f) - head.position;
+                Vector3 flatToTarget = new Vector3(toTarget.x, 0f, toTarget.z);
+                Vector3 flatForward = new Vector3(transform.forward.x, 0f, transform.forward.z);
+
+                if (flatToTarget.sqrMagnitude > 0.04f && flatForward.sqrMagnitude > 0.04f)
+                {
+                    float signedYaw = Vector3.SignedAngle(flatForward.normalized, flatToTarget.normalized, Vector3.up);
+                    if (Mathf.Abs(signedYaw) < 95f)
+                    {
+                        float clampedYaw = Mathf.Clamp(signedYaw, -55f, 55f) * weight;
+                        head.rotation = Quaternion.AngleAxis(clampedYaw, Vector3.up) * head.rotation;
+                    }
+                }
+            }
         }
 
         if (jaw != null)
@@ -376,18 +429,136 @@ public class SmilyMonsterGait : MonoBehaviour
 
         if (hips != null)
         {
-            hips.localPosition += new Vector3(0f, lungeCurve * 0.08f, lungeCurve * 0.06f);
-            hips.localRotation *= Quaternion.Euler(-lungeCurve * 15f, 0f, 0f);
+            hips.localPosition += new Vector3(0f, lungeCurve * 0.16f, lungeCurve * 0.14f);
+            hips.localRotation *= Quaternion.Euler(-lungeCurve * 18f, 0f, 0f);
         }
 
         if (jaw != null)
         {
             // Wide snarling bite
-            jaw.localRotation = jawBaseRot * Quaternion.Euler(lungeCurve * 38f, 0f, 0f);
+            jaw.localRotation = jawBaseRot * Quaternion.Euler(lungeCurve * 48f, 0f, 0f);
         }
 
-        if (frontArmL != null) frontArmL.localRotation *= Quaternion.Euler(lungeCurve * 25f, 0f, 0f);
-        if (frontArmR != null) frontArmR.localRotation *= Quaternion.Euler(lungeCurve * 25f, 0f, 0f);
+        if (frontArmL != null) frontArmL.localRotation *= Quaternion.Euler(lungeCurve * 32f, 0f, 0f);
+        if (frontArmR != null) frontArmR.localRotation *= Quaternion.Euler(lungeCurve * 32f, 0f, 0f);
+    }
+
+    /// <summary>
+    /// Procedurally animates the full terrifying jumpscare maul sequence.
+    /// Operates in unscaled time so it continues during game over sequences.
+    /// </summary>
+    private void ApplyKillMaulPose()
+    {
+        killMaulTimer += Time.unscaledDeltaTime;
+        float t = killMaulTimer;
+
+        // Phase 1: 0.0s to 0.48s - Beast Rears Up on Hind Legs & Unhinges Jaws (Towering Monster)
+        if (t < 0.48f)
+        {
+            float norm = Mathf.Clamp01(t / 0.48f);
+            float ease = Mathf.SmoothStep(0f, 1f, norm);
+
+            // Hind legs squat and brace
+            if (rearLegL != null) rearLegL.localRotation = rearLegLBaseRot * Quaternion.Euler(ease * 32f, 0f, 0f);
+            if (rearLegR != null) rearLegR.localRotation = rearLegRBaseRot * Quaternion.Euler(ease * 32f, 0f, 0f);
+            if (rearCalfL != null) rearCalfL.localRotation = rearCalfLBaseRot * Quaternion.Euler(-ease * 40f, 0f, 0f);
+            if (rearCalfR != null) rearCalfR.localRotation = rearCalfRBaseRot * Quaternion.Euler(-ease * 40f, 0f, 0f);
+
+            // Pelvis & Spine heave UP and pitch back dramatically (beast rears up 1.5m tall)
+            if (hips != null)
+            {
+                hips.localPosition = hipsBasePos + new Vector3(0f, ease * 0.28f, -ease * 0.12f);
+                hips.localRotation = hipsBaseRot * Quaternion.Euler(-ease * 38f, 0f, 0f);
+            }
+            if (spineMid != null) spineMid.localRotation = spineMidBaseRot * Quaternion.Euler(-ease * 26f, 0f, 0f);
+            if (chest != null) chest.localRotation = chestBaseRot * Quaternion.Euler(-ease * 20f, 0f, 0f);
+
+            // Head pitches forward to glare straight into the player's eyes
+            if (head != null)
+            {
+                float tremor = Mathf.Sin(t * 45f) * 4f;
+                head.localRotation = headBaseRot * Quaternion.Euler(ease * 42f + tremor, 0f, 0f);
+            }
+
+            // Horrific wide snarling jaw snaps open
+            if (jaw != null)
+            {
+                jaw.localRotation = jawBaseRot * Quaternion.Euler(ease * 55f, 0f, 0f);
+            }
+
+            // Forelimbs (massive arms) raise high to clamp onto player's face
+            if (frontArmL != null) frontArmL.localRotation = frontArmLBaseRot * Quaternion.Euler(-ease * 42f, -ease * 22f, ease * 18f);
+            if (frontArmR != null) frontArmR.localRotation = frontArmRBaseRot * Quaternion.Euler(-ease * 42f, ease * 22f, -ease * 18f);
+            if (frontForearmL != null) frontForearmL.localRotation = frontForearmLBaseRot * Quaternion.Euler(-ease * 30f, 0f, 0f);
+            if (frontForearmR != null) frontForearmR.localRotation = frontForearmRBaseRot * Quaternion.Euler(-ease * 30f, 0f, 0f);
+        }
+        // Phase 2: 0.48s to 1.35s - Savage Forward Leap & Clamping Maul (Violent Jumpscare Strike)
+        else if (t < 1.35f)
+        {
+            float maulT = t - 0.48f;
+            float lunge = Mathf.Clamp01(maulT / 0.35f);
+
+            // Spine lunges directly forward into camera lens
+            if (hips != null)
+            {
+                hips.localPosition = hipsBasePos + new Vector3(0f, 0.18f, lunge * 0.42f);
+                hips.localRotation = hipsBaseRot * Quaternion.Euler(-18f + Mathf.Sin(maulT * 24f) * 6f, 0f, 0f);
+            }
+            if (spineMid != null) spineMid.localRotation = spineMidBaseRot * Quaternion.Euler(-12f, 0f, 0f);
+            if (chest != null) chest.localRotation = chestBaseRot * Quaternion.Euler(-8f, 0f, 0f);
+
+            // Jaws snap violently shut and open in ferocious mauling bites (3-4 vicious snaps)
+            float snapCycle = Mathf.Abs(Mathf.Sin(maulT * 18f));
+            if (jaw != null)
+            {
+                float jawAngle = Mathf.Lerp(12f, 58f, snapCycle);
+                jaw.localRotation = jawBaseRot * Quaternion.Euler(jawAngle, 0f, 0f);
+            }
+
+            // Head shakes violently during the bite (predator tearing motion)
+            if (head != null)
+            {
+                float headShakeYaw = Mathf.Sin(maulT * 32f) * 14f;
+                float headShakePitch = Mathf.Cos(maulT * 26f) * 10f;
+                head.localRotation = headBaseRot * Quaternion.Euler(headShakePitch, headShakeYaw, 0f);
+            }
+
+            // Claws swipe and clamp forward
+            if (frontArmL != null) frontArmL.localRotation = frontArmLBaseRot * Quaternion.Euler(22f, 28f, 12f);
+            if (frontArmR != null) frontArmR.localRotation = frontArmRBaseRot * Quaternion.Euler(22f, -28f, -12f);
+            if (frontHandL != null) frontHandL.localRotation = frontHandLBaseRot * Quaternion.Euler(30f, 0f, 0f);
+            if (frontHandR != null) frontHandR.localRotation = frontHandRBaseRot * Quaternion.Euler(30f, 0f, 0f);
+        }
+        // Phase 3: 1.35s to 3.5s - Monster Towers Over Fallen Player Pinning to Floor
+        else
+        {
+            float groundT = t - 1.35f;
+
+            // Monster towers directly over fallen player
+            if (hips != null)
+            {
+                hips.localPosition = hipsBasePos + new Vector3(0f, -0.05f, 0.45f);
+                hips.localRotation = hipsBaseRot * Quaternion.Euler(14f, 0f, 0f);
+            }
+
+            // Head looks straight DOWN into fallen camera with snarling breathing
+            if (head != null)
+            {
+                float breathNod = Mathf.Sin(groundT * 7f) * 6f;
+                head.localRotation = headBaseRot * Quaternion.Euler(48f + breathNod, 0f, 0f);
+            }
+
+            // Heavy panting and snapping jaws inches from the lens
+            if (jaw != null)
+            {
+                float snarl = Mathf.Max(0f, Mathf.Sin(groundT * 9f)) * 36f + 16f;
+                jaw.localRotation = jawBaseRot * Quaternion.Euler(snarl, 0f, 0f);
+            }
+
+            // Front limbs planted firmly on the floor around the camera
+            if (frontArmL != null) frontArmL.localRotation = frontArmLBaseRot * Quaternion.Euler(38f, -15f, 0f);
+            if (frontArmR != null) frontArmR.localRotation = frontArmRBaseRot * Quaternion.Euler(38f, 15f, 0f);
+        }
     }
 
     /// <summary>

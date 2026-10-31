@@ -87,11 +87,11 @@ public class VillainAI : MonoBehaviour
 
     [Header("Repositioning (keeps him near the player)")]
     public bool enableTeleport = true;
-    public float maxDistanceFromPlayer = 40f;   // if he drifts beyond this, he teleports back
-    public Vector2 teleportRange = new Vector2(15f, 30f); // distance from player after teleporting
-    public float firstTeleportDelay = 6f;       // waits this long after spawn before first reposition
-    public float teleportCooldown = 10f;        // min seconds between teleports
-    [Range(1, 30)] public int teleportAttempts = 12; // random spots to try per teleport
+    public float maxDistanceFromPlayer = 45f;   // if he drifts beyond this, he teleports back
+    public Vector2 teleportRange = new Vector2(18f, 32f); // distance from player after teleporting
+    public float firstTeleportDelay = 75f;       // initial tension build: 75s of dread before first reposition
+    public float teleportCooldown = 90f;        // min seconds between teleports (prevents spam warping)
+    [Range(1, 30)] public int teleportAttempts = 16; // random spots to try per teleport
     public float teleportSampleRadius = 3f;     // how far a spot may snap onto the NavMesh
     public bool avoidVisibleSpots = true;
     public float playerSightHalfAngle = 60f;
@@ -174,11 +174,17 @@ public class VillainAI : MonoBehaviour
     int speedHash, chasingHash, attack1Hash, attack2Hash;
 
     AudioSource chaseAudioSource;
+    AudioLowPassFilter chaseOcclusionFilter;
     Coroutine chaseAudioRoutine;
     Coroutine chaseFadeRoutine;
     int lastPlayedChaseClipIndex = -1;
+    float shockStareTimer = 0f;
+    BacteriaTwitch bacteriaTwitch;
 
     public static VillainAI Instance { get; private set; }
+    public float TeleportTimer => teleportTimer;
+    public float NextTeleportThreshold => hasTeleported ? teleportCooldown : firstTeleportDelay;
+    public float ShockStareTimer => shockStareTimer;
     float reviveGraceTimer = 0f;
 
     void Awake()
@@ -291,6 +297,27 @@ public class VillainAI : MonoBehaviour
             transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
         }
 
+        // Ensure Kane Pixels' Bacteria is always at its true towering 2.0 scale (~2.85m tall)
+        if (gameObject.name.ToLowerInvariant().Contains("bacteria"))
+        {
+            if (transform.localScale.x < 1.8f)
+            {
+                transform.localScale = new Vector3(2.0f, 2.0f, 2.0f);
+            }
+            eyeHeight = 2.2f;
+            catchDistance = 1.45f;          // Horizontal XZ touch radius for 2.0x scale Bacteria
+            walkAnimReferenceSpeed = 1.75f; // Calibrated for 2.0x scale Injured Run so feet never hyper-step or slide
+            runAnimReferenceSpeed = 3.60f;  // Calibrated for 2.0x scale Running clip
+
+            // Enforce rare, shocking teleport pacing even if scene serialized older inspector values
+            if (firstTeleportDelay < 75f) firstTeleportDelay = 75f;
+            if (teleportCooldown < 90f) teleportCooldown = 90f;
+            if (maxDistanceFromPlayer < 45f) maxDistanceFromPlayer = 45f;
+
+            bacteriaTwitch = GetComponent<BacteriaTwitch>();
+            if (bacteriaTwitch == null) bacteriaTwitch = gameObject.AddComponent<BacteriaTwitch>();
+        }
+
         CacheAnimatorParameters();
         SetChasing(false);
 
@@ -318,7 +345,9 @@ public class VillainAI : MonoBehaviour
 
         if (agent != null)
         {
-            agent.radius = 0.4f;
+            agent.radius = 0.38f;
+            agent.height = 1.80f; // Fits cleanly through all 2.15m doorways while visual mesh towers at 2.85m
+            agent.stoppingDistance = 0.25f; // Never stop short of the player before catchDistance triggers!
             agent.baseOffset = groundOffset;
             if (customTurning)
             {
@@ -351,7 +380,8 @@ public class VillainAI : MonoBehaviour
         if (agent == null) agent = GetComponent<NavMeshAgent>();
         if (agent != null)
         {
-            agent.radius = 0.4f;
+            agent.radius = 0.38f;
+            agent.stoppingDistance = 0.25f;
             agent.baseOffset = groundOffset;
             if (customTurning)
             {
@@ -416,8 +446,44 @@ public class VillainAI : MonoBehaviour
         if (player == null) return;
         if (agent == null || !agent.isOnNavMesh) return;
 
+        // Instant 360-degree physical touch catch in ANY state (never requires touching a specific spot in front)
+        if (CheckPlayerContactCatch())
+        {
+            OnCaughtPlayer();
+            return;
+        }
+
         CheckReposition();
         UpdateAntiStuckWatchdog();
+        UpdateAudioOcclusion();
+
+        if (shockStareTimer > 0f)
+        {
+            shockStareTimer -= Time.deltaTime;
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+            }
+            currentForwardSpeed = 0f;
+            if (player != null)
+            {
+                Vector3 toPlayer = player.position - transform.position;
+                toPlayer.y = 0f;
+                if (toPlayer.sqrMagnitude > 0.01f)
+                {
+                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toPlayer), Time.deltaTime * 12f);
+                }
+            }
+            SyncAnimationSpeed();
+            if (shockStareTimer <= 0f && agent != null && agent.isOnNavMesh)
+            {
+                agent.isStopped = false;
+                SetChasing(true);
+            }
+            return;
+        }
+
         if (customTurning) UpdateRotationAndVelocity();
         SyncAnimationSpeed();
 
@@ -540,6 +606,19 @@ public class VillainAI : MonoBehaviour
             return;
         }
 
+        // Active mutual separation from Hound: if both creatures wander too close to each other, diverge immediately!
+        if (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.gameObject.activeInHierarchy)
+        {
+            float distToHound = Vector3.Distance(transform.position, SmilyHoundAI.Instance.transform.position);
+            if (distToHound < 16f)
+            {
+                transform.rotation = Quaternion.Euler(0f, transform.eulerAngles.y + 180f, 0f);
+                agent.ResetPath();
+                GoToRandomPoint();
+                return;
+            }
+        }
+
         // If path is missing or invalid, do not wait: immediately pick a valid reachable point
         if (!agent.pathPending && (!agent.hasPath || agent.pathStatus == NavMeshPathStatus.PathInvalid))
         {
@@ -586,6 +665,25 @@ public class VillainAI : MonoBehaviour
         {
             StartChasing();
             return;
+        }
+
+        // Territorial separation: if investigating brings Bacteria close to Hound's lair or Exit Portal, break off and return to wandering
+        if (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.gameObject.activeInHierarchy)
+        {
+            float distToHound = Vector3.Distance(transform.position, SmilyHoundAI.Instance.transform.position);
+            float distToPortal = SmilyHoundAI.Instance.portalPosition != Vector3.zero 
+                ? Vector3.Distance(transform.position, SmilyHoundAI.Instance.portalPosition) 
+                : 999f;
+
+            if (distToHound < 16f || distToPortal < 16f)
+            {
+                currentState = State.Wander;
+                agent.speed = wanderSpeed;
+                SetChasing(false);
+                agent.isStopped = false;
+                GoToRandomPoint();
+                return;
+            }
         }
 
         if (isPausedSearching)
@@ -723,32 +821,73 @@ public class VillainAI : MonoBehaviour
             }
         }
 
-        // Check catch & attack
-        if (reviveGraceTimer <= 0f && Vector3.Distance(transform.position, player.position) <= catchDistance)
+        // Check catch
+        if (CheckPlayerContactCatch())
         {
             OnCaughtPlayer();
         }
         else
         {
             hasCaught = false;
-            if (reviveGraceTimer <= 0f) UpdateAttack();
         }
+    }
+
+    bool CheckPlayerContactCatch()
+    {
+        if (player == null || reviveGraceTimer > 0f || PlayerIsHidden || VictoryController.IsGameWon) return false;
+
+        // Measure horizontal XZ distance so vertical height difference (~1.05m between root and PlayerCapsule) never shrinks catch radius
+        Vector2 monsterXZ = new Vector2(transform.position.x, transform.position.z);
+        Vector2 playerXZ = new Vector2(player.position.x, player.position.z);
+        float horizDist = Vector2.Distance(monsterXZ, playerXZ);
+
+        float effectiveCatchRadius = Mathf.Max(catchDistance, 1.45f);
+        if (horizDist > effectiveCatchRadius) return false;
+
+        // Verify no solid wall separates monster and player
+        Vector3 chestOrigin = transform.position + Vector3.up * 1.25f;
+        Vector3 playerChest = player.position + Vector3.up * 1.0f;
+        if (Physics.Linecast(chestOrigin, playerChest, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     void StartChasing()
     {
         if (VictoryController.IsGameWon) return;
 
+        bool wasNotChasing = (currentState != State.Chase);
         currentState = State.Chase;
         agent.speed = chaseSpeed;
-        if (agent.isActiveAndEnabled && agent.isOnNavMesh) agent.isStopped = false;
-        SetChasing(true);
         lostTimer = 0f;
         attackTimer = 0f;
         interceptTimer = 0f;
         lastSeenPlayerPos = player.position;
         lastPlayerPos = player.position;
         agent.SetDestination(player.position);
+
+        // Shocking moment before chase: freeze & twitch for 0.70s while screaming if spotting player from > 4.5m
+        float dist = Vector3.Distance(transform.position, player.position);
+        if (wasNotChasing && dist > 4.5f)
+        {
+            shockStareTimer = 0.70f;
+            SetChasing(false); // Play unsettling Idle (2) with violent twitch spasm during the shock freeze
+            if (bacteriaTwitch != null) bacteriaTwitch.TriggerShockSpasm(0.95f);
+            if (agent.isActiveAndEnabled && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+            }
+        }
+        else
+        {
+            shockStareTimer = 0f;
+            if (agent.isActiveAndEnabled && agent.isOnNavMesh) agent.isStopped = false;
+            SetChasing(true);
+        }
 
         StartChaseAudio();
     }
@@ -766,6 +905,16 @@ public class VillainAI : MonoBehaviour
 
         if (dist <= effectiveRadius)
         {
+            // If noise originated deep within the Hound's exit territory, leave it to the Hound
+            if (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.gameObject.activeInHierarchy)
+            {
+                Vector3 portal = SmilyHoundAI.Instance.portalPosition;
+                if (portal != Vector3.zero && Vector3.Distance(noiseOrigin, portal) < 16f && dist > 18f)
+                {
+                    return;
+                }
+            }
+
             // If already chasing, he's actively locked on
             if (currentState == State.Chase)
             {
@@ -801,11 +950,20 @@ public class VillainAI : MonoBehaviour
         Vector3 target = player.position + Vector3.up * 1f;
         Vector3 dir = target - eyes;
 
-        if (dir.magnitude > currentDistance) return false;
-        if (Vector3.Angle(transform.forward, dir) > currentAngle * 0.5f) return false;
+        Vector3 flatDir = new Vector3(player.position.x - transform.position.x, 0f, player.position.z - transform.position.z);
+        float horizDist = flatDir.magnitude;
+        if (horizDist > currentDistance) return false;
+
+        // Measure horizontal XZ angle so towering 2.2m eye height never causes downward pitch at close range to fail FOV check!
+        // Also allow 360-degree proximity awareness within 2.4m if unobstructed.
+        Vector3 flatForward = new Vector3(transform.forward.x, 0f, transform.forward.z);
+        if (horizDist > 2.4f && flatForward.sqrMagnitude > 0.01f && flatDir.sqrMagnitude > 0.01f)
+        {
+            if (Vector3.Angle(flatForward, flatDir) > currentAngle * 0.5f) return false;
+        }
 
         // Line-of-sight raycast
-        if (Physics.Raycast(eyes, dir.normalized, out RaycastHit hit, currentDistance, ~0, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(eyes, dir.normalized, out RaycastHit hit, dir.magnitude + 0.5f, ~0, QueryTriggerInteraction.Ignore))
         {
             return hit.transform == player || hit.transform.IsChildOf(player) || player.IsChildOf(hit.transform);
         }
@@ -841,18 +999,42 @@ public class VillainAI : MonoBehaviour
 
         NavMeshPath testPath = new NavMeshPath();
 
+        Vector3 houndPos = Vector3.zero;
+        Vector3 portalPos = Vector3.zero;
+        bool hasHound = (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.gameObject.activeInHierarchy);
+        if (hasHound)
+        {
+            houndPos = SmilyHoundAI.Instance.transform.position;
+            portalPos = SmilyHoundAI.Instance.portalPosition;
+        }
+
+        Vector3 fwd = transform.forward;
+        if (hasHound && Vector3.Distance(transform.position, houndPos) < 28f)
+        {
+            // Bias movement away from the Hound to patrol divergent corridors
+            Vector3 awayFromHound = (transform.position - houndPos).normalized;
+            awayFromHound.y = 0f;
+            if (awayFromHound.sqrMagnitude > 0.01f) fwd = awayFromHound;
+        }
+
         // 1. Try corridor sweep angles from forward to reverse (0, +30, -30, +60, -60, +90, -90, +135, -135, 180)
         // If facing a dead-end wall, sweeping to 180 ensures he turns around and patrols back out cleanly!
         float[] angles = new float[] { 0f, 30f, -30f, 60f, -60f, 90f, -90f, 135f, -135f, 180f };
         for (int i = 0; i < angles.Length; i++)
         {
             Quaternion rot = Quaternion.Euler(0f, angles[i], 0f);
-            Vector3 dir = rot * transform.forward;
+            Vector3 dir = rot * fwd;
             float dist = Random.Range(wanderRadius * 0.5f, wanderRadius);
             Vector3 target = transform.position + dir * dist;
 
             if (NavMesh.SamplePosition(target, out NavMeshHit hit, 4.0f, NavMesh.AllAreas))
             {
+                if (hasHound)
+                {
+                    if (Vector3.Distance(hit.position, houndPos) < 20f) continue;
+                    if (portalPos != Vector3.zero && Vector3.Distance(hit.position, portalPos) < 18f) continue;
+                }
+
                 if (NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, testPath))
                 {
                     if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
@@ -871,12 +1053,15 @@ public class VillainAI : MonoBehaviour
             Vector3 stalkSpot = player.position + new Vector3(stalkDir.x, 0f, stalkDir.y) * Random.Range(14f, 24f);
             if (NavMesh.SamplePosition(stalkSpot, out NavMeshHit stalkHit, 6.0f, NavMesh.AllAreas))
             {
-                if (NavMesh.CalculatePath(transform.position, stalkHit.position, NavMesh.AllAreas, testPath))
+                if (!hasHound || (Vector3.Distance(stalkHit.position, houndPos) >= 18f && (portalPos == Vector3.zero || Vector3.Distance(stalkHit.position, portalPos) >= 16f)))
                 {
-                    if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
+                    if (NavMesh.CalculatePath(transform.position, stalkHit.position, NavMesh.AllAreas, testPath))
                     {
-                        agent.SetPath(testPath);
-                        return;
+                        if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
+                        {
+                            agent.SetPath(testPath);
+                            return;
+                        }
                     }
                 }
             }
@@ -888,6 +1073,8 @@ public class VillainAI : MonoBehaviour
             Vector3 random = transform.position + Random.insideUnitSphere * wanderRadius;
             if (NavMesh.SamplePosition(random, out NavMeshHit navHit, 5.0f, NavMesh.AllAreas))
             {
+                if (hasHound && Vector3.Distance(navHit.position, houndPos) < 16f) continue;
+
                 if (NavMesh.CalculatePath(transform.position, navHit.position, NavMesh.AllAreas, testPath))
                 {
                     if (testPath.status == NavMeshPathStatus.PathComplete && testPath.corners.Length >= 2)
@@ -1124,39 +1311,36 @@ public class VillainAI : MonoBehaviour
         if (VictoryController.IsGameWon) return;
         if (headBone == null || player == null) return;
 
-        if (hasCaught)
-        {
-            // Lock eyes straight onto the camera as the monster executes the attack
-            Camera mainCam = Camera.main;
-            if (mainCam != null)
-            {
-                Vector3 toCam = mainCam.transform.position - headBone.position;
-                if (toCam.sqrMagnitude > 0.01f)
-                {
-                    Quaternion lookRot = Quaternion.LookRotation(toCam, Vector3.up);
-                    headBone.rotation = Quaternion.Slerp(headBone.rotation, lookRot, Time.deltaTime * 12f);
-                }
-            }
-            return;
-        }
+        // During kill animation (Zombie Neck Bite), never overwrite the animated head pose!
+        if (hasCaught) return;
 
         if (currentState == State.Wander && !CanSeePlayer()) return;
         if (PlayerIsHidden) return;   // he must not "know" where the hidden player is
 
-        // When hunting, investigating, or chasing, head tracks the player
-        Vector3 targetPoint = player.position + Vector3.up * 1.4f;
-        Vector3 toTarget = targetPoint - headBone.position;
+        // Add subtle horizontal world-space yaw toward player on top of the animated head pose
+        Vector3 toTarget = (player.position + Vector3.up * 1.4f) - headBone.position;
+        Vector3 flatToTarget = new Vector3(toTarget.x, 0f, toTarget.z);
+        Vector3 flatForward = new Vector3(transform.forward.x, 0f, transform.forward.z);
 
-        if (Vector3.Angle(transform.forward, toTarget) < 65f)
+        if (flatToTarget.sqrMagnitude > 0.04f && flatForward.sqrMagnitude > 0.04f)
         {
-            Quaternion lookRot = Quaternion.LookRotation(toTarget, Vector3.up);
-            headBone.rotation = Quaternion.Slerp(headBone.rotation, lookRot, Time.deltaTime * 6f);
+            float signedYaw = Vector3.SignedAngle(flatForward.normalized, flatToTarget.normalized, Vector3.up);
+            if (Mathf.Abs(signedYaw) < 60f)
+            {
+                float clampedYaw = Mathf.Clamp(signedYaw, -38f, 38f) * 0.55f;
+                headBone.rotation = Quaternion.AngleAxis(clampedYaw, Vector3.up) * headBone.rotation;
+            }
         }
     }
 
     void FindHeadBone()
     {
-        headBone = FindChildRecursive(transform, "head", "neck", "spine_03", "spine.003", "spine_02");
+        if (anim != null && anim.isHuman)
+        {
+            headBone = anim.GetBoneTransform(HumanBodyBones.Head);
+            if (headBone != null) return;
+        }
+        headBone = FindChildRecursive(transform, "mixamorig:head", "head_05", "head", "neck");
     }
 
     Transform FindChildRecursive(Transform parent, params string[] names)
@@ -1164,10 +1348,14 @@ public class VillainAI : MonoBehaviour
         for (int i = 0; i < parent.childCount; i++)
         {
             Transform child = parent.GetChild(i);
-            string lowerName = child.name.ToLowerInvariant();
-            foreach (string n in names)
+            // Never pick a SkinnedMeshRenderer/MeshRenderer object (such as Bacteria's 'CableHead' or 'Head' mesh at y=0)
+            if (child.GetComponent<Renderer>() == null)
             {
-                if (lowerName.Contains(n)) return child;
+                string lowerName = child.name.ToLowerInvariant();
+                foreach (string n in names)
+                {
+                    if (lowerName.Contains(n)) return child;
+                }
             }
             Transform found = FindChildRecursive(child, names);
             if (found != null) return found;
@@ -1312,6 +1500,16 @@ public class VillainAI : MonoBehaviour
             float flatDist = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(playerPos.x, playerPos.z));
             if (flatDist < minDist) continue;
 
+            // Never teleport into Hound territory or near the Exit Portal
+            if (SmilyHoundAI.Instance != null && SmilyHoundAI.Instance.gameObject.activeInHierarchy)
+            {
+                if (Vector3.Distance(pos, SmilyHoundAI.Instance.transform.position) < 22f)
+                    continue;
+                if (SmilyHoundAI.Instance.portalPosition != Vector3.zero &&
+                    Vector3.Distance(pos, SmilyHoundAI.Instance.portalPosition) < 22f)
+                    continue;
+            }
+
             if (avoidVisibleSpots && IsSpotVisibleToPlayer(pos)) continue;
 
             spot = pos;
@@ -1323,11 +1521,12 @@ public class VillainAI : MonoBehaviour
 
     bool IsSpotVisibleToPlayer(Vector3 spot)
     {
-        Vector3 eyes = player.position + Vector3.up * eyeHeight;
+        Vector3 eyes = Camera.main != null ? Camera.main.transform.position : (player.position + Vector3.up * 1.35f);
         Vector3 target = spot + Vector3.up * 1.1f;
         Vector3 dir = target - eyes;
 
-        if (Vector3.Angle(player.forward, dir) > playerSightHalfAngle) return false;
+        Vector3 forward = Camera.main != null ? Camera.main.transform.forward : player.forward;
+        if (Vector3.Angle(forward, dir) > playerSightHalfAngle) return false;
 
         if (Physics.Raycast(eyes, dir.normalized, out _, dir.magnitude, ~0, QueryTriggerInteraction.Ignore))
             return false;
@@ -1389,6 +1588,23 @@ public class VillainAI : MonoBehaviour
         chaseAudioSource.dopplerLevel = 0f;
         chaseAudioSource.priority = 64; // High priority so it is never dropped by the audio engine
         chaseAudioSource.volume = chaseVolume * GameSettings.MasterVolume;
+
+        chaseOcclusionFilter = audioObj.GetComponent<AudioLowPassFilter>();
+        if (chaseOcclusionFilter == null)
+        {
+            chaseOcclusionFilter = audioObj.AddComponent<AudioLowPassFilter>();
+        }
+        chaseOcclusionFilter.cutoffFrequency = 22000f;
+    }
+
+    void UpdateAudioOcclusion()
+    {
+        if (chaseOcclusionFilter == null || player == null) return;
+        Vector3 eyes = transform.position + Vector3.up * eyeHeight;
+        Vector3 playerHead = player.position + Vector3.up * 1.45f;
+        bool blocked = Physics.Linecast(eyes, playerHead, LayerMask.GetMask("Default"), QueryTriggerInteraction.Ignore);
+        float targetCutoff = blocked ? 850f : 22000f;
+        chaseOcclusionFilter.cutoffFrequency = Mathf.Lerp(chaseOcclusionFilter.cutoffFrequency, targetCutoff, Time.deltaTime * 8f);
     }
 
     void LoadChaseClipsIfEmpty()

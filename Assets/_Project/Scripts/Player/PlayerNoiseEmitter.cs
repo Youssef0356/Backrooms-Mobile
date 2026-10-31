@@ -76,6 +76,11 @@ public class PlayerNoiseEmitter : MonoBehaviour
         {
             stepTimer = 0f;
             float radius = isSprinting ? sprintNoiseRadius : walkNoiseRadius;
+            if (FloodedZone.IsPlayerInWater)
+            {
+                // In flooded rooms, water splashing resonates loudly down hallways alerting entities from much farther away
+                radius = isSprinting ? 26f : 8.5f;
+            }
             EmitNoise(transform.position, radius);
         }
     }

@@ -25,6 +25,11 @@
 
             <ui:VisualElement name="menu-list" class="menu-list">
 
+                <ui:VisualElement name="menu-item-continue" class="menu-item is-hidden">
+                    <ui:Label class="menu-item-marker" text="&gt;" />
+                    <ui:Button name="continue-button" class="menu-button menu-button--highlight" text="RESUME LEVEL 94" />
+                </ui:VisualElement>
+
                 <ui:VisualElement name="menu-item-play" class="menu-item">
                     <ui:Label class="menu-item-marker" text="&gt;" />
                     <ui:Button name="play-button" class="menu-button" text="ENTER" />
@@ -130,6 +135,18 @@
                         <ui:Label class="key-desc" text="HOLD TO RUN" />
                     </ui:VisualElement>
                     <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="TAP PROMPT" />
+                        <ui:Label class="key-desc" text="TAKE ALMOND WATER" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="ALMOND BUTTON" />
+                        <ui:Label class="key-desc" text="DRINK (RESTORE SANITY)" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="CHALK BUTTON" />
+                        <ui:Label class="key-desc" text="DRAW / CYCLE MARK" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
                         <ui:Label class="key" text="TOP RIGHT GEAR" />
                         <ui:Label class="key-desc" text="SETTINGS / PAUSE" />
                     </ui:VisualElement>
@@ -144,6 +161,22 @@
                     <ui:VisualElement class="key-row">
                         <ui:Label class="key" text="MOUSE" />
                         <ui:Label class="key-desc" text="LOOK AROUND" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="E" />
+                        <ui:Label class="key-desc" text="TAKE ALMOND WATER / INTERACT" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="Q" />
+                        <ui:Label class="key-desc" text="DRINK ALMOND WATER (HEAL)" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="C" />
+                        <ui:Label class="key-desc" text="DRAW CHALK MARK ON WALL" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="key-row">
+                        <ui:Label class="key" text="V" />
+                        <ui:Label class="key-desc" text="CYCLE CHALK SYMBOL (X, ARROW, V)" />
                     </ui:VisualElement>
                     <ui:VisualElement class="key-row">
                         <ui:Label class="key" text="F" />

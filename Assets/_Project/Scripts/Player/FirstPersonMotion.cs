@@ -36,22 +36,22 @@ namespace StarterAssets
         [Header("Gait / Head Bobbing (Harmonic Lissajous)")]
         [Tooltip("Enable gait head bobbing while walking and sprinting.")]
         public bool enableHeadBob = true;
-        [Tooltip("Stride cycle frequency in Hz when walking (~1.9 steps/sec).")]
-        public float walkBobFrequency = 0.95f;
-        [Tooltip("Stride cycle frequency in Hz when sprinting (~2.7 steps/sec).")]
-        public float sprintBobFrequency = 1.35f;
+        [Tooltip("Stride cycle frequency in Hz when walking (~1.8 steps/sec).")]
+        public float walkBobFrequency = 0.90f;
+        [Tooltip("Stride cycle frequency in Hz when sprinting (~2.6 steps/sec).")]
+        public float sprintBobFrequency = 1.30f;
         [Tooltip("Walking bob amplitude (X: lateral sway, Y: vertical dip, Z: forward-back).")]
-        public Vector3 walkBobAmplitude = new Vector3(0.015f, 0.022f, 0.009f);
-        [Tooltip("Sprinting bob amplitude.")]
-        public Vector3 sprintBobAmplitude = new Vector3(0.030f, 0.046f, 0.018f);
+        public Vector3 walkBobAmplitude = new Vector3(0.010f, 0.016f, 0.006f);
+        [Tooltip("Sprinting bob amplitude (smooth & weighted).")]
+        public Vector3 sprintBobAmplitude = new Vector3(0.016f, 0.026f, 0.010f);
         [Tooltip("Walking camera roll tilt in degrees per step.")]
-        public float walkRollAngle = 0.85f;
+        public float walkRollAngle = 0.35f;
         [Tooltip("Sprinting camera roll tilt in degrees per step.")]
-        public float sprintRollAngle = 1.90f;
+        public float sprintRollAngle = 0.65f;
         [Tooltip("Walking pitch nod in degrees.")]
-        public float walkPitchAngle = 0.40f;
+        public float walkPitchAngle = 0.20f;
         [Tooltip("Sprinting pitch nod in degrees.")]
-        public float sprintPitchAngle = 1.05f;
+        public float sprintPitchAngle = 0.45f;
 
         [Header("Dynamic Lean & Inertia")]
         [Tooltip("Enable strafe roll banking and rotational inertia.")]
@@ -108,6 +108,7 @@ namespace StarterAssets
         private float _lastVerticalVelocity;
         private bool _stepTriggerArmed;
         private float _lastStepTime;
+        private int _lastStepIndex = -1;
 
         private void Awake()
         {
@@ -177,10 +178,22 @@ namespace StarterAssets
                     _landingVelocity -= dip * 25.0f;
 
                     // Play landing sound
-                    if (enableAudio && _landClip != null && _audioSource != null)
+                    if (enableAudio && _audioSource != null)
                     {
-                        _audioSource.pitch = Random.Range(0.95f, 1.05f);
-                        _audioSource.PlayOneShot(_landClip, landVolume);
+                        if (FloodedZone.IsPlayerInWater)
+                        {
+                            AudioClip[] splashes = FloodedZone.GetOrCreateSplashSFX();
+                            if (splashes != null && splashes.Length > 0)
+                            {
+                                _audioSource.pitch = Random.Range(0.90f, 1.05f);
+                                _audioSource.PlayOneShot(splashes[0], landVolume * 1.2f * GameSettings.MasterVolume);
+                            }
+                        }
+                        else if (_landClip != null)
+                        {
+                            _audioSource.pitch = Random.Range(0.95f, 1.05f);
+                            _audioSource.PlayOneShot(_landClip, landVolume * GameSettings.MasterVolume);
+                        }
                     }
                 }
             }
@@ -361,26 +374,43 @@ namespace StarterAssets
 
         private void OnFootstepLanded(bool isSprinting)
         {
-            // Enforce minimum time between steps to prevent spamming
-            float minInterval = isSprinting ? 0.30f : 0.44f;
+            // Enforce realistic minimum time between footsteps to eliminate rapid repetition
+            float minInterval = isSprinting ? 0.45f : 0.52f;
             if (Time.time - _lastStepTime < minInterval) return;
             _lastStepTime = Time.time;
 
             // Subtle micro-compression jolt on foot impact
             if (enableImpacts)
             {
-                _landingVelocity -= 0.08f;
+                _landingVelocity -= 0.05f;
             }
 
-            // Play random footstep audio
-            if (enableAudio && _footstepClips != null && _footstepClips.Length > 0 && _audioSource != null)
+            // Play random non-repeating footstep audio
+            if (enableAudio && _audioSource != null)
             {
-                AudioClip clip = _footstepClips[Random.Range(0, _footstepClips.Length)];
-                if (clip != null)
+                AudioClip[] clipsToUse = FloodedZone.IsPlayerInWater
+                    ? FloodedZone.GetOrCreateSplashSFX()
+                    : _footstepClips;
+
+                if (clipsToUse != null && clipsToUse.Length > 0)
                 {
-                    _audioSource.pitch = Random.Range(0.92f, 1.08f);
-                    float vol = isSprinting ? sprintVolume : walkVolume;
-                    _audioSource.PlayOneShot(clip, vol);
+                    int index = Random.Range(0, clipsToUse.Length);
+                    if (clipsToUse.Length > 1 && index == _lastStepIndex)
+                    {
+                        index = (index + 1) % clipsToUse.Length;
+                    }
+                    _lastStepIndex = index;
+
+                    AudioClip clip = clipsToUse[index];
+                    if (clip != null)
+                    {
+                        _audioSource.pitch = Random.Range(0.93f, 1.07f);
+                        float baseVol = FloodedZone.IsPlayerInWater
+                            ? (isSprinting ? 0.85f : 0.55f)
+                            : (isSprinting ? sprintVolume : walkVolume);
+                        float vol = baseVol * GameSettings.MasterVolume;
+                        _audioSource.PlayOneShot(clip, vol);
+                    }
                 }
             }
         }
